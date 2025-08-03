@@ -1,0 +1,16 @@
+# Временные файлы
+*.o
+*.a
+*.so
+*.dll
+*.exe
+
+# Логи и IDE
+*.log
+.vscode/
+.idea/
+*.swp
+*~
+
+# Visual Studio Code
+.vs/
