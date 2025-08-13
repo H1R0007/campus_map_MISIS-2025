@@ -1,16 +1,84 @@
-# Временные файлы
-*.o
-*.a
-*.so
-*.dll
-*.exe
+# =========================
+# glavnie pravila
+# =========================
 
-# Логи и IDE
+# ignoriruem binarniki
+/build/
+/build/win/
+/build/web/
+/out/
+
+# =========================
+# compilatori / instrumenti
+# =========================
+
+# proizvilnie binarniki
+*.exe
+*.dll
+*.so
+*.dylib
+*.lib
+*.a
+*.lo
+*.la
+
+# obektnie faili
+*.o
+*.obj
+
+# PDB
+*.pdb
+*.idb
+
+# =========================
+# CMAKE
+# =========================
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps
+
+# =========================
+# SDL / EMSCRIPTEN
+# =========================
+
+# skompilirovannie web dannie
+*.html
+*.js
+*.wasm
+*.data
+*.tmp
+
+# logi
 *.log
-.vscode/
-.idea/
-*.swp
-*~
+
+# =========================
+# IDE / redaktori
+# =========================
 
 # Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# CLion / JetBrains
+.idea/
+
+# Visual Studio / MSBuild
 .vs/
+*.vcxproj*
+*.sln
+
+# macOS slizhebnie
+.DS_Store
+
+# Windows sluzhebnie
+Thumbs.db
+ehthumbs.db
