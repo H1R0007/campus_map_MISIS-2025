@@ -3,7 +3,7 @@
 #include <unordered_map>
 
 
-# Структура параметров точек
+// Структура параметров точек
 struct Nod {
 	int nod_id;
 	std::string nod_name;
