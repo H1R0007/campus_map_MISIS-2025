@@ -17,6 +17,16 @@ add_executable(campus_map
     src/main.cpp
 )
 
+# Источник алгоритма поиска пути
+add_executable(pathfinder
+    src/path_finder/path_finder.cpp
+)
+
+# Источник алгоритма сбора информации о точках
+add_executable(readnodes
+    src/read_nodes/nodes.cpp
+)
+
 # Варнинги
 if (MSVC)
   target_compile_options(campus_map PRIVATE /W4 /permissive-)
