@@ -3,10 +3,8 @@
 # =========================
 
 # ignoriruem binarniki
-/build/
-/build/win/
-/build/web/
-/out/
+build/
+out/
 
 # =========================
 # compilatori / instrumenti
@@ -82,3 +80,6 @@ _deps
 # Windows sluzhebnie
 Thumbs.db
 ehthumbs.db
+
+#nlohmann 
+include/nlohmann/
