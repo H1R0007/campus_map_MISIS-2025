@@ -1,7 +1,7 @@
 #include "path_finder/nodes.hpp"
 using json = nlohmann::json;
 
-
+# Чтение информации о точках
 static void load_nods(const std::string& jsonStr) {
 	auto dat = json::parse(jsonStr);
 	for (auto& nod_dat : dat["nods"]) {
