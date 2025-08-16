@@ -8,14 +8,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Удобно для IDE/анализа
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+add_executable(campus_map
+    src/main.cpp "src/Map_Visuality/Map_Viewer.cpp" "src/Engine/Engine.cpp" "src/Camera/Camera.cpp" "src/map/Graph.cpp")
+
 # Опции (можно быстро выключать доп. либы)
 option(USE_SDL_IMAGE "Use SDL2_image (PNG, JPG, etc.)" ON)
 option(USE_SDL_TTF   "Use SDL2_ttf (fonts)"            ON)
-
-# Источники
-add_executable(campus_map
-    src/main.cpp
-)
 
 # Варнинги
 if (MSVC)
@@ -24,7 +22,7 @@ else()
   target_compile_options(campus_map PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
-# Если конфигурируем через emcmake / Emscripten toolchain
+# Если конфигурируем через emcmake / Emscripten toolchainейч
 if (EMSCRIPTEN)
   message(STATUS "Target: Web (Emscripten)")
 
@@ -66,25 +64,33 @@ if (EMSCRIPTEN)
       "--shell-file" "${CMAKE_SOURCE_DIR}/web/shell.html"
     )
   endif()
+endif()
 
-else()
-  message(STATUS "Target: Native (Windows)")
+if (NOT EMSCRIPTEN)
+    message(STATUS "Target: Native (Windows)")
 
-  # SDL2 от vcpkg (перед конфигурацией передай -DCMAKE_TOOLCHAIN_FILE=...vcpkg.cmake)
-  find_package(SDL2 CONFIG REQUIRED)
-  target_link_libraries(campus_map PRIVATE SDL2::SDL2 SDL2::SDL2main)
-
-  if (USE_SDL_IMAGE)
+    find_package(SDL2 CONFIG REQUIRED)
     find_package(SDL2_image CONFIG REQUIRED)
-    if (TARGET SDL2::SDL2_image)
-      target_link_libraries(campus_map PRIVATE SDL2::SDL2_image)
-    endif()
-  endif()
-
-  if (USE_SDL_TTF)
     find_package(SDL2_ttf CONFIG REQUIRED)
-    if (TARGET SDL2::SDL2_ttf)
-      target_link_libraries(campus_map PRIVATE SDL2::SDL2_ttf)
-    endif()
-  endif()
+
+
+    target_link_libraries(campus_map PRIVATE
+        SDL2::SDL2
+        SDL2_image::SDL2_image
+        SDL2_ttf::SDL2_ttf
+    )
+endif()
+
+if (EMSCRIPTEN)
+    include(FetchContent)
+    FetchContent_Declare(
+      nlohmann_json
+      GIT_REPOSITORY https://github.com/nlohmann/json.git
+      GIT_TAG v3.11.3
+    )
+    FetchContent_MakeAvailable(nlohmann_json)
+    target_link_libraries(campus_map PRIVATE nlohmann_json::nlohmann_json)
+else()
+    find_package(nlohmann_json CONFIG REQUIRED)
+    target_link_libraries(campus_map PRIVATE nlohmann_json::nlohmann_json)
 endif()
