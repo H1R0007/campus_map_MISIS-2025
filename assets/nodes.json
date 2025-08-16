@@ -1,0 +1,874 @@
+{
+    "nodes": [
+        {
+            "id": "node_38",
+            "neighbors": [
+                "node_1"
+            ],
+            "x": 631,
+            "y": 1313
+        },
+        {
+            "id": "node_1",
+            "neighbors": [
+                "node_37",
+                "node_2",
+                "node_7",
+                "node_38",
+                "node_87"
+            ],
+            "x": 552,
+            "y": 1348
+        },
+        {
+            "id": "node_2",
+            "neighbors": [
+                "node_1"
+            ],
+            "x": 472,
+            "y": 1319
+        },
+        {
+            "id": "node_3",
+            "neighbors": [],
+            "x": 449,
+            "y": 1300
+        },
+        {
+            "id": "node_4",
+            "neighbors": [],
+            "x": 467,
+            "y": 1283
+        },
+        {
+            "id": "node_5",
+            "neighbors": [],
+            "x": 496,
+            "y": 1259
+        },
+        {
+            "id": "node_6",
+            "neighbors": [],
+            "x": 530,
+            "y": 1259
+        },
+        {
+            "id": "node_7",
+            "neighbors": [
+                "node_1"
+            ],
+            "x": 530,
+            "y": 1284
+        },
+        {
+            "id": "node_8",
+            "neighbors": [],
+            "x": 466,
+            "y": 1246
+        },
+        {
+            "id": "node_31",
+            "neighbors": [],
+            "x": 294,
+            "y": 993
+        },
+        {
+            "id": "node_9",
+            "neighbors": [],
+            "x": 397,
+            "y": 1246
+        },
+        {
+            "id": "node_30",
+            "neighbors": [],
+            "x": 401,
+            "y": 991
+        },
+        {
+            "id": "node_10",
+            "neighbors": [],
+            "x": 467,
+            "y": 1201
+        },
+        {
+            "id": "node_43",
+            "neighbors": [],
+            "x": 796,
+            "y": 1085
+        },
+        {
+            "id": "node_11",
+            "neighbors": [],
+            "x": 394,
+            "y": 1199
+        },
+        {
+            "id": "node_42",
+            "neighbors": [],
+            "x": 719,
+            "y": 1081
+        },
+        {
+            "id": "node_12",
+            "neighbors": [],
+            "x": 547,
+            "y": 1199
+        },
+        {
+            "id": "node_41",
+            "neighbors": [],
+            "x": 620,
+            "y": 1170
+        },
+        {
+            "id": "node_13",
+            "neighbors": [],
+            "x": 476,
+            "y": 1157
+        },
+        {
+            "id": "node_40",
+            "neighbors": [
+                "node_39"
+            ],
+            "x": 621,
+            "y": 1272
+        },
+        {
+            "id": "node_14",
+            "neighbors": [],
+            "x": 548,
+            "y": 1156
+        },
+        {
+            "id": "node_47",
+            "neighbors": [],
+            "x": 624,
+            "y": 1048
+        },
+        {
+            "id": "node_15",
+            "neighbors": [],
+            "x": 454,
+            "y": 1145
+        },
+        {
+            "id": "node_46",
+            "neighbors": [],
+            "x": 624,
+            "y": 969
+        },
+        {
+            "id": "node_16",
+            "neighbors": [],
+            "x": 400,
+            "y": 1145
+        },
+        {
+            "id": "node_45",
+            "neighbors": [],
+            "x": 627,
+            "y": 1005
+        },
+        {
+            "id": "node_17",
+            "neighbors": [],
+            "x": 476,
+            "y": 1112
+        },
+        {
+            "id": "node_44",
+            "neighbors": [],
+            "x": 719,
+            "y": 1007
+        },
+        {
+            "id": "node_18",
+            "neighbors": [],
+            "x": 549,
+            "y": 1111
+        },
+        {
+            "id": "node_19",
+            "neighbors": [],
+            "x": 455,
+            "y": 1094
+        },
+        {
+            "id": "node_20",
+            "neighbors": [],
+            "x": 399,
+            "y": 1092
+        },
+        {
+            "id": "node_21",
+            "neighbors": [],
+            "x": 477,
+            "y": 1052
+        },
+        {
+            "id": "node_22",
+            "neighbors": [],
+            "x": 550,
+            "y": 1055
+        },
+        {
+            "id": "node_23",
+            "neighbors": [],
+            "x": 399,
+            "y": 1045
+        },
+        {
+            "id": "node_24",
+            "neighbors": [],
+            "x": 301,
+            "y": 1088
+        },
+        {
+            "id": "node_25",
+            "neighbors": [],
+            "x": 297,
+            "y": 1043
+        },
+        {
+            "id": "node_26",
+            "neighbors": [],
+            "x": 474,
+            "y": 1010
+        },
+        {
+            "id": "node_27",
+            "neighbors": [],
+            "x": 548,
+            "y": 1010
+        },
+        {
+            "id": "node_28",
+            "neighbors": [],
+            "x": 548,
+            "y": 962
+        },
+        {
+            "id": "node_64",
+            "neighbors": [],
+            "x": 640,
+            "y": 907
+        },
+        {
+            "id": "node_29",
+            "neighbors": [],
+            "x": 472,
+            "y": 990
+        },
+        {
+            "id": "node_32",
+            "neighbors": [],
+            "x": 268,
+            "y": 1128
+        },
+        {
+            "id": "node_33",
+            "neighbors": [],
+            "x": 257,
+            "y": 1176
+        },
+        {
+            "id": "node_34",
+            "neighbors": [],
+            "x": 268,
+            "y": 1232
+        },
+        {
+            "id": "node_35",
+            "neighbors": [],
+            "x": 302,
+            "y": 1287
+        },
+        {
+            "id": "node_36",
+            "neighbors": [],
+            "x": 365,
+            "y": 1337
+        },
+        {
+            "id": "node_37",
+            "neighbors": [
+                "node_1"
+            ],
+            "x": 447,
+            "y": 1366
+        },
+        {
+            "id": "node_39",
+            "neighbors": [],
+            "x": 647,
+            "y": 1300
+        },
+        {
+            "id": "node_48",
+            "neighbors": [],
+            "x": 725,
+            "y": 974
+        },
+        {
+            "id": "node_49",
+            "neighbors": [],
+            "x": 697,
+            "y": 1006
+        },
+        {
+            "id": "node_50",
+            "neighbors": [],
+            "x": 698,
+            "y": 968
+        },
+        {
+            "id": "node_51",
+            "neighbors": [],
+            "x": 673,
+            "y": 1006
+        },
+        {
+            "id": "node_52",
+            "neighbors": [],
+            "x": 673,
+            "y": 975
+        },
+        {
+            "id": "node_53",
+            "neighbors": [],
+            "x": 471,
+            "y": 942
+        },
+        {
+            "id": "node_54",
+            "neighbors": [],
+            "x": 399,
+            "y": 936
+        },
+        {
+            "id": "node_55",
+            "neighbors": [],
+            "x": 473,
+            "y": 904
+        },
+        {
+            "id": "node_56",
+            "neighbors": [],
+            "x": 471,
+            "y": 889
+        },
+        {
+            "id": "node_57",
+            "neighbors": [],
+            "x": 343,
+            "y": 888
+        },
+        {
+            "id": "node_58",
+            "neighbors": [],
+            "x": 315,
+            "y": 860
+        },
+        {
+            "id": "node_59",
+            "neighbors": [],
+            "x": 579,
+            "y": 900
+        },
+        {
+            "id": "node_60",
+            "neighbors": [],
+            "x": 601,
+            "y": 899
+        },
+        {
+            "id": "node_61",
+            "neighbors": [],
+            "x": 619,
+            "y": 900
+        },
+        {
+            "id": "node_62",
+            "neighbors": [],
+            "x": 619,
+            "y": 935
+        },
+        {
+            "id": "node_63",
+            "neighbors": [],
+            "x": 619,
+            "y": 910
+        },
+        {
+            "id": "node_65",
+            "neighbors": [],
+            "x": 619,
+            "y": 849
+        },
+        {
+            "id": "node_66",
+            "neighbors": [],
+            "x": 655,
+            "y": 851
+        },
+        {
+            "id": "node_67",
+            "neighbors": [],
+            "x": 623,
+            "y": 769
+        },
+        {
+            "id": "node_68",
+            "neighbors": [],
+            "x": 652,
+            "y": 769
+        },
+        {
+            "id": "node_69",
+            "neighbors": [],
+            "x": 676,
+            "y": 772
+        },
+        {
+            "id": "node_70",
+            "neighbors": [],
+            "x": 680,
+            "y": 807
+        },
+        {
+            "id": "node_71",
+            "neighbors": [],
+            "x": 682,
+            "y": 848
+        },
+        {
+            "id": "node_72",
+            "neighbors": [],
+            "x": 681,
+            "y": 885
+        },
+        {
+            "id": "node_73",
+            "neighbors": [],
+            "x": 680,
+            "y": 873
+        },
+        {
+            "id": "node_74",
+            "neighbors": [],
+            "x": 713,
+            "y": 873
+        },
+        {
+            "id": "node_75",
+            "neighbors": [],
+            "x": 711,
+            "y": 911
+        },
+        {
+            "id": "node_76",
+            "neighbors": [],
+            "x": 677,
+            "y": 912
+        },
+        {
+            "id": "node_77",
+            "neighbors": [],
+            "x": 801,
+            "y": 1005
+        },
+        {
+            "id": "node_78",
+            "neighbors": [],
+            "x": 879,
+            "y": 1005
+        },
+        {
+            "id": "node_79",
+            "neighbors": [],
+            "x": 936,
+            "y": 1005
+        },
+        {
+            "id": "node_80",
+            "neighbors": [],
+            "x": 935,
+            "y": 1050
+        },
+        {
+            "id": "node_81",
+            "neighbors": [],
+            "x": 720,
+            "y": 1043
+        },
+        {
+            "id": "node_82",
+            "neighbors": [],
+            "x": 853,
+            "y": 1046
+        },
+        {
+            "id": "node_83",
+            "neighbors": [],
+            "x": 922,
+            "y": 1121
+        },
+        {
+            "id": "node_84",
+            "neighbors": [],
+            "x": 902,
+            "y": 1187
+        },
+        {
+            "id": "node_85",
+            "neighbors": [],
+            "x": 878,
+            "y": 1237
+        },
+        {
+            "id": "node_86",
+            "neighbors": [],
+            "x": 840,
+            "y": 1269
+        },
+        {
+            "id": "node_87",
+            "neighbors": [
+                "node_1"
+            ],
+            "x": 634,
+            "y": 1361
+        },
+        {
+            "id": "node_88",
+            "neighbors": [],
+            "x": 707,
+            "y": 1348
+        },
+        {
+            "id": "node_89",
+            "neighbors": [],
+            "x": 753,
+            "y": 1322
+        },
+        {
+            "id": "node_90",
+            "neighbors": [],
+            "x": 797,
+            "y": 1296
+        },
+        {
+            "id": "node_91",
+            "neighbors": [],
+            "x": 963,
+            "y": 1012
+        },
+        {
+            "id": "node_92",
+            "neighbors": [],
+            "x": 1016,
+            "y": 1010
+        },
+        {
+            "id": "node_93",
+            "neighbors": [],
+            "x": 1046,
+            "y": 962
+        },
+        {
+            "id": "node_94",
+            "neighbors": [],
+            "x": 981,
+            "y": 1007
+        },
+        {
+            "id": "node_95",
+            "neighbors": [],
+            "x": 980,
+            "y": 957
+        },
+        {
+            "id": "node_96",
+            "neighbors": [],
+            "x": 937,
+            "y": 957
+        },
+        {
+            "id": "node_97",
+            "neighbors": [],
+            "x": 740,
+            "y": 911
+        },
+        {
+            "id": "node_98",
+            "neighbors": [],
+            "x": 738,
+            "y": 900
+        },
+        {
+            "id": "node_99",
+            "neighbors": [],
+            "x": 751,
+            "y": 900
+        },
+        {
+            "id": "node_100",
+            "neighbors": [],
+            "x": 780,
+            "y": 901
+        },
+        {
+            "id": "node_101",
+            "neighbors": [],
+            "x": 1074,
+            "y": 893
+        },
+        {
+            "id": "node_102",
+            "neighbors": [],
+            "x": 1073,
+            "y": 876
+        },
+        {
+            "id": "node_103",
+            "neighbors": [],
+            "x": 1112,
+            "y": 1008
+        },
+        {
+            "id": "node_104",
+            "neighbors": [],
+            "x": 1192,
+            "y": 1007
+        },
+        {
+            "id": "node_105",
+            "neighbors": [],
+            "x": 1221,
+            "y": 1007
+        },
+        {
+            "id": "node_106",
+            "neighbors": [],
+            "x": 1222,
+            "y": 963
+        },
+        {
+            "id": "node_107",
+            "neighbors": [],
+            "x": 1275,
+            "y": 1011
+        },
+        {
+            "id": "node_108",
+            "neighbors": [],
+            "x": 969,
+            "y": 1179
+        },
+        {
+            "id": "node_109",
+            "neighbors": [],
+            "x": 1058,
+            "y": 1151
+        },
+        {
+            "id": "node_110",
+            "neighbors": [],
+            "x": 1166,
+            "y": 1125
+        },
+        {
+            "id": "node_111",
+            "neighbors": [],
+            "x": 1224,
+            "y": 1083
+        },
+        {
+            "id": "node_112",
+            "neighbors": [],
+            "x": 1134,
+            "y": 1008
+        },
+        {
+            "id": "node_113",
+            "neighbors": [],
+            "x": 1131,
+            "y": 959
+        },
+        {
+            "id": "node_114",
+            "neighbors": [],
+            "x": 1131,
+            "y": 921
+        },
+        {
+            "id": "node_115",
+            "neighbors": [],
+            "x": 1136,
+            "y": 889
+        },
+        {
+            "id": "node_116",
+            "neighbors": [],
+            "x": 1136,
+            "y": 874
+        },
+        {
+            "id": "node_117",
+            "neighbors": [],
+            "x": 1129,
+            "y": 872
+        },
+        {
+            "id": "node_118",
+            "neighbors": [],
+            "x": 1129,
+            "y": 827
+        },
+        {
+            "id": "node_119",
+            "neighbors": [],
+            "x": 1127,
+            "y": 810
+        },
+        {
+            "id": "node_120",
+            "neighbors": [],
+            "x": 1042,
+            "y": 810
+        },
+        {
+            "id": "node_121",
+            "neighbors": [],
+            "x": 1038,
+            "y": 847
+        },
+        {
+            "id": "node_122",
+            "neighbors": [],
+            "x": 1005,
+            "y": 846
+        },
+        {
+            "id": "node_123",
+            "neighbors": [],
+            "x": 1003,
+            "y": 809
+        },
+        {
+            "id": "node_124",
+            "neighbors": [],
+            "x": 1003,
+            "y": 753
+        },
+        {
+            "id": "node_125",
+            "neighbors": [],
+            "x": 1164,
+            "y": 869
+        },
+        {
+            "id": "node_126",
+            "neighbors": [],
+            "x": 1187,
+            "y": 869
+        },
+        {
+            "id": "node_127",
+            "neighbors": [],
+            "x": 1187,
+            "y": 832
+        },
+        {
+            "id": "node_128",
+            "neighbors": [],
+            "x": 1208,
+            "y": 869
+        },
+        {
+            "id": "node_129",
+            "neighbors": [],
+            "x": 1260,
+            "y": 869
+        },
+        {
+            "id": "node_130",
+            "neighbors": [],
+            "x": 1259,
+            "y": 825
+        },
+        {
+            "id": "node_131",
+            "neighbors": [],
+            "x": 1258,
+            "y": 904
+        },
+        {
+            "id": "node_132",
+            "neighbors": [],
+            "x": 1297,
+            "y": 875
+        },
+        {
+            "id": "node_133",
+            "neighbors": [],
+            "x": 1312,
+            "y": 876
+        },
+        {
+            "id": "node_134",
+            "neighbors": [],
+            "x": 1320,
+            "y": 859
+        },
+        {
+            "id": "node_135",
+            "neighbors": [],
+            "x": 1317,
+            "y": 819
+        },
+        {
+            "id": "node_136",
+            "neighbors": [],
+            "x": 1313,
+            "y": 754
+        },
+        {
+            "id": "node_137",
+            "neighbors": [],
+            "x": 1006,
+            "y": 874
+        },
+        {
+            "id": "node_138",
+            "neighbors": [],
+            "x": 970,
+            "y": 874
+        },
+        {
+            "id": "node_139",
+            "neighbors": [],
+            "x": 969,
+            "y": 830
+        },
+        {
+            "id": "node_140",
+            "neighbors": [],
+            "x": 934,
+            "y": 869
+        },
+        {
+            "id": "node_141",
+            "neighbors": [],
+            "x": 886,
+            "y": 872
+        },
+        {
+            "id": "node_142",
+            "neighbors": [],
+            "x": 866,
+            "y": 871
+        }
+    ]
+}
