@@ -147,7 +147,8 @@ void MapViewer::handleEvent(SDL_Event& event) {
 
             const Uint8* keys = SDL_GetKeyboardState(nullptr);
 
-            // ====== SHIFT + ПКМ = удаление узла или ребра ======
+            // ====== SHIFT + ПКМ ======
+            // Удаление (узла или staged-соседа в neighborMode)
             if (keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT]) {
                 std::string targetNodeId;
 
@@ -162,24 +163,34 @@ void MapViewer::handleEvent(SDL_Event& event) {
                     }
                 }
 
-                // Если нашли узел под курсором
                 if (!targetNodeId.empty()) {
-                    // Если есть активный узел (neighborMode) → удаляем ребро
                     if (neighborMode && !activeNodeId.empty() && activeNodeId != targetNodeId) {
-                        std::cout << "Removing edge between "
-                            << activeNodeId << " and " << targetNodeId << "\n";
-                        graph.removeNeighbor(activeNodeId, targetNodeId);
+                        // --- Удаляем staged соседа из pendingNeighbors ---
+                        auto it = std::find(pendingNeighbors.begin(),
+                            pendingNeighbors.end(),
+                            targetNodeId);
+                        if (it != pendingNeighbors.end()) {
+                            pendingNeighbors.erase(it);
+                            std::cout << "Removed staged neighbor "
+                                << targetNodeId << " from " << activeNodeId << "\n";
+                        }
+                        else {
+                            std::cout << "No staged edge between "
+                                << activeNodeId << " and " << targetNodeId
+                                << " to remove\n";
+                        }
                     }
                     else {
-                        // Иначе удаляем сам узел
+                        // --- Удаляем сам узел (если не в режиме соседа) ---
                         std::cout << "Removing node " << targetNodeId << "\n";
                         graph.removeNodeById(targetNodeId);
                     }
-                    return;
+                    return; // обработали Shift+ПКМ
                 }
             }
 
-            // ====== ALT + ПКМ = выбор activeNode ======
+            // ====== ALT + ПКМ ======
+            // Выбор активного узла → начало neighborMode
             if (keys[SDL_SCANCODE_LALT] || keys[SDL_SCANCODE_RALT]) {
                 for (auto& [id, node] : graph.getNodesMutable()) {
                     SDL_Point scr = camera.worldToScreen({ node.x, node.y });
@@ -190,13 +201,14 @@ void MapViewer::handleEvent(SDL_Event& event) {
                         neighborMode = true;
                         pendingNeighbors.clear();
                         std::cout << "Neighbor mode started for " << id << "\n";
-                        break;
+                        return;
                     }
                 }
             }
 
-            else if (neighborMode && !activeNodeId.empty()) {
-                // добавление соседа (staging)
+            // ====== ПКМ (в neighborMode) ======
+            // Добавление staged соседа
+            if (neighborMode && !activeNodeId.empty()) {
                 for (auto& [id, node] : graph.getNodesMutable()) {
                     SDL_Point scr = camera.worldToScreen({ node.x, node.y });
                     int dx = scr.x - clickScreen.x;
@@ -207,14 +219,14 @@ void MapViewer::handleEvent(SDL_Event& event) {
                             std::cout << "Staged neighbor "
                                 << id << " for " << activeNodeId << "\n";
                         }
-                        break;
+                        return;
                     }
                 }
             }
-            else {
-                // создание нового узла
-                graph.addNode(clickWorld.x, clickWorld.y);
-            }
+
+            // ====== Обычный ПКМ ======
+            // Создать новый узел
+            graph.addNode(clickWorld.x, clickWorld.y);
         }
     }
 
@@ -222,6 +234,7 @@ void MapViewer::handleEvent(SDL_Event& event) {
         if (Config::DEV_MODE) {
             if (event.key.keysym.sym == SDLK_RETURN || event.key.keysym.sym == SDLK_KP_ENTER) {
                 if (neighborMode && !activeNodeId.empty()) {
+                    // Подтверждаем все staged соседи
                     for (auto& nb : pendingNeighbors) {
                         graph.addNeighbor(activeNodeId, nb);
                     }
@@ -231,6 +244,7 @@ void MapViewer::handleEvent(SDL_Event& event) {
                         << pendingNeighbors.size() << " neighbors\n";
                 }
 
+                // В любом случае выходим из режима
                 neighborMode = false;
                 activeNodeId.clear();
                 pendingNeighbors.clear();
