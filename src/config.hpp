@@ -1,27 +1,41 @@
-#pragma once
+п»ї#pragma once
 
 namespace Config {
-    // Окно
+    // РћРєРЅРѕ
     inline int WINDOW_WIDTH = 800;
     inline int WINDOW_HEIGHT = 600;
     constexpr const char* WINDOW_TITLE = "Campus Map";
 
-    // Карта
+    // РљР°СЂС‚Р°
     constexpr const char* MAP_PATH = "assets/Map.png";
     constexpr int MAP_WIDTH = 1476;
     constexpr int MAP_HEIGHT = 780;
 
-    // Рабочее поле (Canvas)
+    // Р Р°Р±РѕС‡РµРµ РїРѕР»Рµ (Canvas)
     constexpr int CANVAS_WIDTH = 2000;
     constexpr int CANVAS_HEIGHT = 2000;
 
-    // Масштаб
+    // РњР°СЃС€С‚Р°Р±
     constexpr float MIN_ZOOM = 0.5f;
     constexpr float MAX_ZOOM = 3.0f;
 
-    // Developer mode flag 
-    constexpr bool DEV_MODE = true; // переключать перед релизом!
-
-    //путь к json
+    //РїСѓС‚СЊ Рє json
     constexpr const char* NODES_PATH = "assets/nodes.json";
+
+    // compileвЂ‘time: РєР°РєРѕР№ Р±РёР»Рґ
+    constexpr bool BUILD_DEV = true;   // РїСЂРё СЂРµР»РёР·Рµ СЃС‚Р°РІРёС‚Рµ false
+
+    // runtime: С‚РµРєСѓС‰РµРµ СЃРѕСЃС‚РѕСЏРЅРёРµ dev СЂРµР¶РёРјР°
+    inline bool DEV_MODE = BUILD_DEV;
+
+    inline void toggleDevMode() {
+        if constexpr (BUILD_DEV) {
+            DEV_MODE = !DEV_MODE;
+        }
+        // РµСЃР»Рё BUILD_DEV=false в†’ РїСЂРѕСЃС‚Рѕ РЅРёС‡РµРіРѕ
+    }
+
+    inline void forceUserMode() {
+        DEV_MODE = false;
+    }
 }
