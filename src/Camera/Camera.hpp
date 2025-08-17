@@ -16,6 +16,7 @@ public:
     void move(int dx, int dy);
     void centerOnCanvas();
     void setWorldSize(int width, int height);
+    void setViewportSize(int w, int h);
 
     void update();
     SDL_Point worldToScreen(const SDL_Point& world) const;

@@ -2,8 +2,8 @@
 
 namespace Config {
     // Окно
-    constexpr int WINDOW_WIDTH = 800;
-    constexpr int WINDOW_HEIGHT = 600;
+    inline int WINDOW_WIDTH = 800;
+    inline int WINDOW_HEIGHT = 600;
     constexpr const char* WINDOW_TITLE = "Campus Map";
 
     // Карта

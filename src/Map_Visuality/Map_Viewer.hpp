@@ -13,6 +13,7 @@ public:
     void handleEvent(SDL_Event& event);
     void render();
     void renderOverlay();  // текст поверх
+    void onWindowResized(int w, int h);
 
 private:
 

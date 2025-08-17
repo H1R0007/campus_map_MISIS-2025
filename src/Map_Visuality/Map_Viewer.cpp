@@ -18,7 +18,7 @@ MapViewer::MapViewer(SDL_Renderer* renderer, const char* mapPath)
     mapRect.h = mapSize.y;
 
     camera = Camera();  
-    camera.setWorldSize(mapRect.w, mapRect.h);
+    camera.setWorldSize(Config::CANVAS_WIDTH, Config::CANVAS_HEIGHT);
     font = TTF_OpenFont("assets/fonts/Roboto-Regular.ttf", 16);
     if (!font) {
         std::cerr << "Failed to load font: " << TTF_GetError() << std::endl;
@@ -57,7 +57,9 @@ void MapViewer::renderOverlay() {
         SDL_Color gray = { 80, 80, 80, 255 };
         SDL_Surface* surf = TTF_RenderText_Blended(font, help.c_str(), gray);
         SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, surf);
-        SDL_Rect dst{ 10, Config::WINDOW_HEIGHT - surf->h - 10, surf->w, surf->h };
+        int winW, winH;
+        SDL_GetRendererOutputSize(renderer, &winW, &winH);
+        SDL_Rect dst{ 10, winH - surf->h - 10, surf->w, surf->h };
         SDL_FreeSurface(surf);
         SDL_RenderCopy(renderer, tex, nullptr, &dst);
         SDL_DestroyTexture(tex);
@@ -295,22 +297,40 @@ void MapViewer::render() {
     }
     // ======== Всё ниже — только для DEV_MODE ========
     if (Config::DEV_MODE) {
-        SDL_SetRenderDrawColor(renderer, 220, 220, 220, 255); // светло-серый
+        SDL_SetRenderDrawColor(renderer, 220, 220, 220, 255);
 
-        int step = 100; // шаг сетки
-        int scaledCanvasW = static_cast<int>(Config::CANVAS_WIDTH * camera.getScale());
-        int scaledCanvasH = static_cast<int>(Config::CANVAS_HEIGHT * camera.getScale());
+        // Размер окна
+        int winW, winH;
+        SDL_GetRendererOutputSize(renderer, &winW, &winH);
+
+        // Видимые мировые границы
+        SDL_Point topLeftWorld = camera.screenToWorld({ 0, 0 });
+        SDL_Point botRightWorld = camera.screenToWorld({ winW, winH });
+
+        int baseStep = 100;
+        int step = baseStep;
+
+        // Адаптивность: минимум 25px в масштабе
+        while (step * camera.getScale() < 25) {
+            step *= 2;
+        }
+
+        // Нормализуем стартовые координаты
+        int startX = (topLeftWorld.x / step) * step;
+        int startY = (topLeftWorld.y / step) * step;
 
         // Вертикальные линии
-        for (int x = 0; x <= scaledCanvasW; x += step) {
-            int screenX = x - camera.getViewport().x;
-            SDL_RenderDrawLine(renderer, screenX, 0, screenX, Config::WINDOW_HEIGHT);
+        for (int x = startX; x <= botRightWorld.x; x += step) {
+            SDL_Point scrA = camera.worldToScreen({ x, topLeftWorld.y });
+            SDL_Point scrB = camera.worldToScreen({ x, botRightWorld.y });
+            SDL_RenderDrawLine(renderer, scrA.x, scrA.y, scrB.x, scrB.y);
         }
 
         // Горизонтальные линии
-        for (int y = 0; y <= scaledCanvasH; y += step) {
-            int screenY = y - camera.getViewport().y;
-            SDL_RenderDrawLine(renderer, 0, screenY, Config::WINDOW_WIDTH, screenY);
+        for (int y = startY; y <= botRightWorld.y; y += step) {
+            SDL_Point scrA = camera.worldToScreen({ topLeftWorld.x, y });
+            SDL_Point scrB = camera.worldToScreen({ botRightWorld.x, y });
+            SDL_RenderDrawLine(renderer, scrA.x, scrA.y, scrB.x, scrB.y);
         }
     }
 
@@ -379,6 +399,9 @@ void MapViewer::render() {
     }
 }
 
+void MapViewer::onWindowResized(int w, int h) {
+    camera.setViewportSize(w, h);
+}
 
 MapViewer::~MapViewer() {
     if (mapTexture) SDL_DestroyTexture(mapTexture);

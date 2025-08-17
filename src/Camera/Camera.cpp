@@ -1,10 +1,10 @@
-#include "Camera.hpp"
+﻿#include "Camera.hpp"
 #include <algorithm>
 
 Camera::Camera()
     : viewport{ 0, 0, Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT },
     scale(1.0f),
-    worldWidth(Config::CANVAS_WIDTH),   // �� ��������� canvas
+    worldWidth(Config::CANVAS_WIDTH),   // по умолчанию canvas
     worldHeight(Config::CANVAS_HEIGHT)
 {
     centerOnCanvas();
@@ -13,6 +13,12 @@ Camera::Camera()
 void Camera::setWorldSize(int width, int height) {
     worldWidth = width;
     worldHeight = height;
+    clampViewport();
+}
+
+void Camera::setViewportSize(int w, int h) {
+    viewport.w = w;
+    viewport.h = h;
     clampViewport();
 }
 
@@ -64,21 +70,33 @@ void Camera::centerOnCanvas() {
 }
 
 void Camera::clampViewport() {
-    int scaledW = static_cast<int>(worldWidth * scale);
-    int scaledH = static_cast<int>(worldHeight * scale);
+    int scaledCanvasW = static_cast<int>(worldWidth * scale);
+    int scaledCanvasH = static_cast<int>(worldHeight * scale);
 
-    if (scaledW <= viewport.w) {
-        viewport.x = (scaledW - viewport.w) / 2;
+    // "коридор" вокруг карты (% от окна)
+    int padX = viewport.w / 5;
+    int padY = viewport.h / 5;
+
+    // Горизонталь
+    if (scaledCanvasW <= viewport.w) {
+        // Карта уже меньше окна → центрируем и даём двигать ±padX
+        viewport.x = (scaledCanvasW - viewport.w) / 2;
+        viewport.x = std::clamp(viewport.x, -padX, padX);
     }
     else {
-        viewport.x = std::clamp(viewport.x, 0, scaledW - viewport.w);
+        // Карта больше окна → коридор по обеим сторонам
+        viewport.x = std::clamp(viewport.x, -padX,
+            scaledCanvasW - viewport.w + padX);
     }
 
-    if (scaledH <= viewport.h) {
-        viewport.y = (scaledH - viewport.h) / 2;
+    // Вертикаль
+    if (scaledCanvasH <= viewport.h) {
+        viewport.y = (scaledCanvasH - viewport.h) / 2;
+        viewport.y = std::clamp(viewport.y, -padY, padY);
     }
     else {
-        viewport.y = std::clamp(viewport.y, 0, scaledH - viewport.h);
+        viewport.y = std::clamp(viewport.y, -padY,
+            scaledCanvasH - viewport.h + padY);
     }
 }
 

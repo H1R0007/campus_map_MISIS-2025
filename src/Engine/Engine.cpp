@@ -17,7 +17,7 @@ Engine::Engine(const char* title, int w, int h) : isRunning(true) {
         SDL_WINDOWPOS_CENTERED,
         Config::WINDOW_WIDTH,
         Config::WINDOW_HEIGHT,
-        SDL_WINDOW_SHOWN
+        SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
     );
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
@@ -28,6 +28,30 @@ void Engine::handleEvents() {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         if (event.type == SDL_QUIT) stop();
+
+        if (event.type == SDL_KEYDOWN) {
+            if (event.key.keysym.sym == SDLK_F11) {
+                Uint32 flags = SDL_GetWindowFlags(window);
+                if (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) {
+                    SDL_SetWindowFullscreen(window, 0);  // выйти из fullscreen
+                }
+                else {
+                    SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP); // войти
+                }
+            }
+        }
+
+        if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_RESIZED) {
+            int newW = event.window.data1;
+            int newH = event.window.data2;
+            Config::WINDOW_WIDTH = newW;
+            Config::WINDOW_HEIGHT = newH;
+
+            // —ообщаем всем заинтересованным
+            // (ћожно напр€мую обновить камеру через MapViewer)
+            mapViewer->onWindowResized(newW, newH);
+        }
+
         mapViewer->handleEvent(event);
     }
 }
