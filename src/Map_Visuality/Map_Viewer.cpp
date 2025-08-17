@@ -8,7 +8,7 @@
 MapViewer::MapViewer(SDL_Renderer* renderer, const char* mapPath)
     : renderer(renderer), mapSize{ Config::MAP_WIDTH, Config::MAP_HEIGHT }
 {
-    graph.loadFromJson("assets/nodes.json");
+    graph.loadFromJson(Config::NODES_PATH);
     loadMap(mapPath);
 
     // Центрируем карту внутри CANVAS
@@ -17,7 +17,8 @@ MapViewer::MapViewer(SDL_Renderer* renderer, const char* mapPath)
     mapRect.w = mapSize.x;
     mapRect.h = mapSize.y;
 
-    camera = Camera();  // Камера сама центрируется на Canvas в конструкторе
+    camera = Camera();  
+    camera.setWorldSize(mapRect.w, mapRect.h);
     font = TTF_OpenFont("assets/fonts/Roboto-Regular.ttf", 16);
     if (!font) {
         std::cerr << "Failed to load font: " << TTF_GetError() << std::endl;
@@ -144,25 +145,39 @@ void MapViewer::handleEvent(SDL_Event& event) {
 
             const Uint8* keys = SDL_GetKeyboardState(nullptr);
 
-            // ====== SHIFT + ПКМ = удаление узла ======
+            // ====== SHIFT + ПКМ = удаление узла или ребра ======
             if (keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT]) {
-                std::string toDelete;
+                std::string targetNodeId;
+
+                // Находим узел под курсором
                 for (auto& [id, node] : graph.getNodes()) {
                     SDL_Point scr = camera.worldToScreen({ node.x, node.y });
                     int dx = scr.x - clickScreen.x;
                     int dy = scr.y - clickScreen.y;
                     if (dx * dx + dy * dy <= 25) {
-                        toDelete = id;
+                        targetNodeId = id;
                         break;
                     }
                 }
-                if (!toDelete.empty()) {
-                    graph.removeNodeById(toDelete); // удаляем уже ВНЕ итерации
+
+                // Если нашли узел под курсором
+                if (!targetNodeId.empty()) {
+                    // Если есть активный узел (neighborMode) → удаляем ребро
+                    if (neighborMode && !activeNodeId.empty() && activeNodeId != targetNodeId) {
+                        std::cout << "Removing edge between "
+                            << activeNodeId << " and " << targetNodeId << "\n";
+                        graph.removeNeighbor(activeNodeId, targetNodeId);
+                    }
+                    else {
+                        // Иначе удаляем сам узел
+                        std::cout << "Removing node " << targetNodeId << "\n";
+                        graph.removeNodeById(targetNodeId);
+                    }
                     return;
                 }
             }
 
-            // ====== Alt + ПКМ = выбор activeNode ======
+            // ====== ALT + ПКМ = выбор activeNode ======
             if (keys[SDL_SCANCODE_LALT] || keys[SDL_SCANCODE_RALT]) {
                 for (auto& [id, node] : graph.getNodesMutable()) {
                     SDL_Point scr = camera.worldToScreen({ node.x, node.y });
@@ -179,13 +194,12 @@ void MapViewer::handleEvent(SDL_Event& event) {
             }
 
             else if (neighborMode && !activeNodeId.empty()) {
-                // добавляем соседа
+                // добавление соседа (staging)
                 for (auto& [id, node] : graph.getNodesMutable()) {
                     SDL_Point scr = camera.worldToScreen({ node.x, node.y });
                     int dx = scr.x - clickScreen.x;
                     int dy = scr.y - clickScreen.y;
                     if (dx * dx + dy * dy <= 25 && id != activeNodeId) {
-
                         if (std::find(pendingNeighbors.begin(), pendingNeighbors.end(), id) == pendingNeighbors.end()) {
                             pendingNeighbors.push_back(id);
                             std::cout << "Staged neighbor "
@@ -201,27 +215,20 @@ void MapViewer::handleEvent(SDL_Event& event) {
             }
         }
     }
+
     if (event.type == SDL_KEYDOWN) {
         if (Config::DEV_MODE) {
             if (event.key.keysym.sym == SDLK_RETURN || event.key.keysym.sym == SDLK_KP_ENTER) {
                 if (neighborMode && !activeNodeId.empty()) {
-                    Node& activeNode = graph.getNodesMutable()[activeNodeId];
-
                     for (auto& nb : pendingNeighbors) {
-                        Node& neighborNode = graph.getNodesMutable()[nb];
-
-                        if (std::find(activeNode.neighbors.begin(), activeNode.neighbors.end(), nb) == activeNode.neighbors.end())
-                            activeNode.neighbors.push_back(nb);
-
-                        if (std::find(neighborNode.neighbors.begin(), neighborNode.neighbors.end(), activeNodeId) == neighborNode.neighbors.end())
-                            neighborNode.neighbors.push_back(activeNodeId);
+                        graph.addNeighbor(activeNodeId, nb);
                     }
 
-                    graph.saveToJson("assets/nodes.json");
                     std::cout << "Neighbor mode ended for "
                         << activeNodeId << ", saved "
                         << pendingNeighbors.size() << " neighbors\n";
                 }
+
                 neighborMode = false;
                 activeNodeId.clear();
                 pendingNeighbors.clear();
@@ -247,7 +254,7 @@ void MapViewer::handleEvent(SDL_Event& event) {
                 if (Config::DEV_MODE) {
                     std::cout << "CTRL+S QuickSave\n";
                     lastSaveTick = SDL_GetTicks(); // запомнить время сохранения
-                    graph.saveToJson("assets/nodes.json");
+                    graph.saveToJson("Config::NODES_PATH");
                 }
             }
         }
@@ -275,8 +282,8 @@ void MapViewer::render() {
         // Откуда берём пиксели на текстуре
         srcRect.x = (intersection.x - mapInWorld.x) / camera.getScale();
         srcRect.y = (intersection.y - mapInWorld.y) / camera.getScale();
-        srcRect.w = intersection.w / camera.getScale();
-        srcRect.h = intersection.h / camera.getScale();
+        srcRect.w = std::max(1, int(intersection.w / camera.getScale()));
+        srcRect.h = std::max(1, int(intersection.h / camera.getScale()));
 
         // Куда рисуем на экране
         destRect.x = intersection.x - viewportWorld.x;
