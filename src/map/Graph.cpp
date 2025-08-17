@@ -101,6 +101,10 @@ void Graph::addNode(int x, int y) {
     nodes[node.id] = node;
     std::cout << "Added " << node.id << " at (" << x << "," << y << ")\n";
 
+    // === Запоминаем в историю Undo ===
+    Action act{ ActionType::AddNode, node, node.id, "" };
+    pushAction(act);
+
     if (!jsonPath.empty()) {
         saveToJson(jsonPath);
     }
@@ -172,9 +176,49 @@ void Graph::removeNodeById(const std::string& nodeId, bool trackHistory) {
     nodes.erase(it);
 
     if (trackHistory) {
-        undoStack.push_back({ ActionType::RemoveNode, removed, nodeId, "" });
-        redoStack.clear();
+        pushAction({ ActionType::RemoveNode, removed, nodeId, "" });
     }
+    saveToJson(jsonPath);
+}
+
+void Graph::addNeighbor(const std::string& nodeId, const std::string& neighborId) {
+    if (nodeId == neighborId) return; // не связываем с самим собой
+    auto itA = nodes.find(nodeId);
+    auto itB = nodes.find(neighborId);
+    if (itA == nodes.end() || itB == nodes.end()) return;
+
+    Node& a = itA->second;
+    Node& b = itB->second;
+
+    if (std::find(a.neighbors.begin(), a.neighbors.end(), neighborId) == a.neighbors.end())
+        a.neighbors.push_back(neighborId);
+    if (std::find(b.neighbors.begin(), b.neighbors.end(), nodeId) == b.neighbors.end())
+        b.neighbors.push_back(nodeId);
+
+    pushAction({ ActionType::AddNeighbor, {}, nodeId, neighborId });
+
+    saveToJson(jsonPath);
+}
+
+void Graph::removeNeighbor(const std::string& nodeId, const std::string& neighborId) {
+    auto itA = nodes.find(nodeId);
+    auto itB = nodes.find(neighborId);
+    if (itA == nodes.end() || itB == nodes.end()) return;
+
+    Node& a = itA->second;
+    Node& b = itB->second;
+
+    a.neighbors.erase(
+        std::remove(a.neighbors.begin(), a.neighbors.end(), neighborId),
+        a.neighbors.end()
+    );
+    b.neighbors.erase(
+        std::remove(b.neighbors.begin(), b.neighbors.end(), nodeId),
+        b.neighbors.end()
+    );
+
+    pushAction({ ActionType::RemoveNeighbor, {}, nodeId, neighborId });
+
     saveToJson(jsonPath);
 }
 
@@ -198,16 +242,11 @@ void Graph::undo() {
         break;
     }
     case ActionType::AddNeighbor: {
-        // отменяем добавление соседа
-        auto& n = nodes[act.nodeId];
-        n.neighbors.erase(
-            std::remove(n.neighbors.begin(), n.neighbors.end(), act.neighborId),
-            n.neighbors.end());
+        removeNeighbor(act.nodeId, act.neighborId);
         break;
     }
-    case ActionType::RemoveNeighbor: {
-        // вернуть соседа обратно
-        nodes[act.nodeId].neighbors.push_back(act.neighborId);
+    case ActionType::RemoveNeighbor:{
+        addNeighbor(act.nodeId, act.neighborId);
         break;
     }
     }
@@ -233,14 +272,11 @@ void Graph::redo() {
         break;
     }
     case ActionType::AddNeighbor: {
-        nodes[act.nodeId].neighbors.push_back(act.neighborId);
+        addNeighbor(act.nodeId, act.neighborId);
         break;
     }
-    case ActionType::RemoveNeighbor: {
-        auto& n = nodes[act.nodeId];
-        n.neighbors.erase(
-            std::remove(n.neighbors.begin(), n.neighbors.end(), act.neighborId),
-            n.neighbors.end());
+    case ActionType::RemoveNeighbor:{
+        removeNeighbor(act.nodeId, act.neighborId);
         break;
     }
     }

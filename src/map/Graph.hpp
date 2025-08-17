@@ -25,6 +25,10 @@ public:
     void addNode(int x, int y);
     void removeLastNode();
     void removeNodeById(const std::string& nodeId, bool trackHistory = true);
+
+    void addNeighbor(const std::string& nodeId, const std::string& neighborId);
+    void removeNeighbor(const std::string& nodeId, const std::string& neighborId);
+
     void undo();   
     void redo();  
 
@@ -39,5 +43,10 @@ private:
 
     std::vector<Action> undoStack;
     std::vector<Action> redoStack;
+
+    void pushAction(const Action& action) {
+        undoStack.push_back(action);
+        redoStack.clear();
+    }
 };
 
