@@ -39,6 +39,13 @@ void Engine::handleEvents() {
                     SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP); // войти
                 }
             }
+            if (event.key.keysym.sym == SDLK_F2) {
+                // Эта клавиша будет работать только если билд разработческий
+                if (Config::BUILD_DEV) {
+                    Config::toggleDevMode();
+                    std::cout << "Switched mode: " << (Config::DEV_MODE ? "DEV" : "USER") << "\n";
+                }
+            }
         }
 
         if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_RESIZED) {
