@@ -23,6 +23,7 @@ private:
 
     std::string activeNodeId;
     bool neighborMode = false;
+    std::vector<std::string> pendingNeighbors;  // временные соседи
 
     SDL_Texture* mapTexture;
     SDL_Renderer* renderer;
@@ -35,4 +36,6 @@ private:
     TTF_Font* font = nullptr;
 
     void loadMap(const char* path);
+
+    Uint32 lastSaveTick = 0;
 };
