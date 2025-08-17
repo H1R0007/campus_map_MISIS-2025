@@ -3,9 +3,17 @@
 
 Camera::Camera()
     : viewport{ 0, 0, Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT },
-    scale(1.0f)
+    scale(1.0f),
+    worldWidth(Config::CANVAS_WIDTH),   // по умолчанию canvas
+    worldHeight(Config::CANVAS_HEIGHT)
 {
     centerOnCanvas();
+}
+
+void Camera::setWorldSize(int width, int height) {
+    worldWidth = width;
+    worldHeight = height;
+    clampViewport();
 }
 
 void Camera::setScale(float newScale) {
@@ -56,21 +64,21 @@ void Camera::centerOnCanvas() {
 }
 
 void Camera::clampViewport() {
-    int scaledCanvasW = static_cast<int>(Config::CANVAS_WIDTH * scale);
-    int scaledCanvasH = static_cast<int>(Config::CANVAS_HEIGHT * scale);
+    int scaledW = static_cast<int>(worldWidth * scale);
+    int scaledH = static_cast<int>(worldHeight * scale);
 
-    if (scaledCanvasW <= viewport.w) {
-        viewport.x = (scaledCanvasW - viewport.w) / 2;
+    if (scaledW <= viewport.w) {
+        viewport.x = (scaledW - viewport.w) / 2;
     }
     else {
-        viewport.x = std::clamp(viewport.x, 0, scaledCanvasW - viewport.w);
+        viewport.x = std::clamp(viewport.x, 0, scaledW - viewport.w);
     }
 
-    if (scaledCanvasH <= viewport.h) {
-        viewport.y = (scaledCanvasH - viewport.h) / 2;
+    if (scaledH <= viewport.h) {
+        viewport.y = (scaledH - viewport.h) / 2;
     }
     else {
-        viewport.y = std::clamp(viewport.y, 0, scaledCanvasH - viewport.h);
+        viewport.y = std::clamp(viewport.y, 0, scaledH - viewport.h);
     }
 }
 

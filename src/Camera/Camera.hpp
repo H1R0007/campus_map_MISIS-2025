@@ -15,6 +15,7 @@ public:
     void zoom(float zoomFactor, ZoomMode mode, const SDL_Point& screenPos = { 0,0 });
     void move(int dx, int dy);
     void centerOnCanvas();
+    void setWorldSize(int width, int height);
 
     void update();
     SDL_Point worldToScreen(const SDL_Point& world) const;
@@ -26,6 +27,9 @@ public:
 private:
     SDL_Rect viewport;
     float scale;
+
+    int worldWidth;
+    int worldHeight;
 
     void clampViewport();
 };
