@@ -11,6 +11,8 @@ Engine::Engine(const char* title, int w, int h) : isRunning(true) {
         std::cerr << "Failed to init TTF: " << TTF_GetError() << std::endl;
     }
 
+    SDL_StartTextInput();
+
     window = SDL_CreateWindow(
         Config::WINDOW_TITLE,
         SDL_WINDOWPOS_CENTERED,
@@ -94,6 +96,9 @@ Engine::~Engine() {
     delete mapViewer;
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
+
+    SDL_StopTextInput();
+
     TTF_Quit();
     SDL_Quit();
 }

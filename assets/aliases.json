@@ -1,0 +1,48 @@
+{
+  "aliases": [
+    {
+      "id": "node_38",
+      "name": "main entrance"
+    },
+    {
+      "id": "node_1",
+      "name": "Вестибюль"
+    },
+    {
+      "id": "node_2",
+      "name": "Коридор левый"
+    },
+    {
+      "id": "node_3",
+      "name": "aud 101"
+    },
+    {
+      "id": "node_4",
+      "name": "aud 102"
+    },
+    {
+      "id": "node_5",
+      "name": "aud 103"
+    },
+    {
+      "id": "node_6",
+      "name": "aud 104"
+    },
+    {
+      "id": "node_7",
+      "name": "Коридор правый"
+    },
+    {
+      "id": "node_31",
+      "name": "Выход к библиотеке"
+    },
+    {
+      "id": "node_8",
+      "name": "Лестница на 2 этаж"
+    },
+    {
+      "id": "node_100",
+      "name": "srabotai"
+    }
+  ]
+}

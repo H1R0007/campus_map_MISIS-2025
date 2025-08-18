@@ -19,8 +19,8 @@ namespace Config {
     constexpr float MIN_ZOOM = 0.5f;
     constexpr float MAX_ZOOM = 3.0f;
 
-    // !!! Путь к json (поменял nodef.json на правильное имя)
     constexpr const char* NODES_PATH = "assets/nodes.json";
+    constexpr const char* ALIASES_PATH = "assets/aliases.json";
 
     // Путь к шрифту (чтобы было явно)
     constexpr const char* FONT_PATH = "assets/fonts/Roboto-Regular.ttf";

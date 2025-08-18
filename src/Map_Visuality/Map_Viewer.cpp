@@ -10,6 +10,7 @@ MapViewer::MapViewer(SDL_Renderer* renderer, const char* mapPath)
 {
     graph.loadFromJson(Config::NODES_PATH);
     loadMap(mapPath);
+    aliasManager.load(Config::ALIASES_PATH);
 
     // Центрируем карту внутри CANVAS
     mapRect.x = (Config::CANVAS_WIDTH - mapSize.x) / 2;
@@ -17,11 +18,32 @@ MapViewer::MapViewer(SDL_Renderer* renderer, const char* mapPath)
     mapRect.w = mapSize.x;
     mapRect.h = mapSize.y;
 
-    camera = Camera();  
+    camera = Camera();
     camera.setWorldSize(Config::CANVAS_WIDTH, Config::CANVAS_HEIGHT);
     font = TTF_OpenFont("assets/fonts/Roboto-Regular.ttf", 16);
     if (!font) {
         std::cerr << "Failed to load font: " << TTF_GetError() << std::endl;
+    }
+}
+
+void MapViewer::buildPathFromAliases(const std::string& startName, const std::string& endName) {
+    std::string startId = aliasManager.resolve(startName);
+    std::string endId = aliasManager.resolve(endName);
+
+    if (startId.empty() || endId.empty()) {
+        std::cout << "Alias not found: " << startName << " or " << endName << "\n";
+        currentPath.clear();
+        return;
+    }
+
+    currentPath = find_shortest_path(startId, endId, graph.getNodes());
+
+    if (currentPath.empty()) {
+        std::cout << "Путь не найден между " << startName << " и " << endName << "\n";
+    }
+    else {
+        std::cout << "Путь построен: " << startName << " -> " << endName
+            << " (" << currentPath.size() << " шагов)\n";
     }
 }
 
@@ -51,6 +73,28 @@ void MapViewer::renderOverlay() {
     SDL_FreeSurface(surf2);
     SDL_RenderCopy(renderer, tex2, nullptr, &dst2);
     SDL_DestroyTexture(tex2);
+
+
+    // Панель поиска маршрута
+    SDL_Color black = { 0,0,0,255 };
+
+    // Поле "Откуда"
+    std::string labelFrom = "OTKYDA: " + inputFrom + (editingFrom ? "_" : "");
+    SDL_Surface* surfFrom = TTF_RenderText_Blended(font, labelFrom.c_str(), black);
+    SDL_Texture* texFrom = SDL_CreateTextureFromSurface(renderer, surfFrom);
+    SDL_Rect dstFrom{ 10, 60, surfFrom->w, surfFrom->h };
+    SDL_FreeSurface(surfFrom);
+    SDL_RenderCopy(renderer, texFrom, nullptr, &dstFrom);
+    SDL_DestroyTexture(texFrom);
+
+    // Поле "Куда"
+    std::string labelTo = "KYDA: " + inputTo + (!editingFrom ? "_" : "");
+    SDL_Surface* surfTo = TTF_RenderText_Blended(font, labelTo.c_str(), black);
+    SDL_Texture* texTo = SDL_CreateTextureFromSurface(renderer, surfTo);
+    SDL_Rect dstTo{ 10, 90, surfTo->w, surfTo->h };
+    SDL_FreeSurface(surfTo);
+    SDL_RenderCopy(renderer, texTo, nullptr, &dstTo);
+    SDL_DestroyTexture(texTo);
 
     if (Config::DEV_MODE) {
         std::string help = "Alt + RMB = choose node | RMB = add node / stage neighbor | Enter = confirm | Esc = cancel | Ctrl + Z = undo | Ctrl + Y = redo | Ctrl + S = save";
@@ -100,6 +144,52 @@ void MapViewer::loadMap(const char* path) {
 }
 
 void MapViewer::handleEvent(SDL_Event& event) {
+    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT && Config::DEV_MODE) {
+        SDL_Point clickScreen{ event.button.x, event.button.y };
+        SDL_Point clickWorld = camera.screenToWorld(clickScreen);
+
+        std::string clickedId;
+
+        // Находим ближайший узел
+        for (auto& [id, node] : graph.getNodes()) {
+            SDL_Point scr = camera.worldToScreen({ node.x, node.y });
+            int dx = scr.x - clickScreen.x;
+            int dy = scr.y - clickScreen.y;
+            if (dx * dx + dy * dy <= 25) { // радиус 5px
+                clickedId = id;
+                break;
+            }
+        }
+
+        if (!clickedId.empty()) {
+            if (startNodeId.empty()) {
+                startNodeId = clickedId;
+                std::cout << "Start selected: " << startNodeId << "\n";
+            }
+            else if (endNodeId.empty()) {
+                endNodeId = clickedId;
+                std::cout << "End selected: " << endNodeId << "\n";
+
+                // Запуск алгоритма
+                currentPath = find_shortest_path(startNodeId, endNodeId, graph.getNodes());
+
+                if (currentPath.empty()) {
+                    std::cout << "Путь не найден!\n";
+                }
+                else {
+                    std::cout << "Путь рассчитан: " << currentPath.size() << " шагов\n";
+                }
+            }
+            else {
+                // Сброс, если выбрали снова (третьим кликом)
+                startNodeId.clear();
+                endNodeId.clear();
+                currentPath.clear();
+                std::cout << "Сброс выбора точек\n";
+            }
+        }
+    }
+
     if (event.type == SDL_MOUSEWHEEL) {
         SDL_GetMouseState(&lastMousePos.x, &lastMousePos.y);
         float zoomFactor = (event.wheel.y > 0) ? 1.1f : 0.9f;
@@ -275,6 +365,29 @@ void MapViewer::handleEvent(SDL_Event& event) {
             }
         }
     }
+
+    if (event.type == SDL_TEXTINPUT) {
+        if (editingFrom) inputFrom += event.text.text;
+        else inputTo += event.text.text;
+    }
+    if (event.type == SDL_KEYDOWN) {
+        switch (event.key.keysym.sym) {
+        case SDLK_TAB:
+            editingFrom = !editingFrom; // переключаем поле
+            break;
+        case SDLK_BACKSPACE:
+            if (editingFrom && !inputFrom.empty()) inputFrom.pop_back();
+            if (!editingFrom && !inputTo.empty()) inputTo.pop_back();
+            break;
+        case SDLK_RETURN:
+        case SDLK_KP_ENTER:
+            if (!inputFrom.empty() && !inputTo.empty()) {
+                // пытаемся построить путь
+                buildPathFromAliases(inputFrom, inputTo);
+            }
+            break;
+        }
+    }
 }
 
 void MapViewer::render() {
@@ -408,6 +521,20 @@ void MapViewer::render() {
                         SDL_DestroyTexture(tex);
                     }
                 }
+            }
+        }
+    }
+
+    // ====== Отрисовка найденного пути ======
+    if (!currentPath.empty()) {
+        SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // синий путь
+        for (size_t i = 1; i < currentPath.size(); i++) {
+            auto* from = graph.getNode(currentPath[i - 1]);
+            auto* to = graph.getNode(currentPath[i]);
+            if (from && to) {
+                SDL_Point scrA = camera.worldToScreen({ from->x, from->y });
+                SDL_Point scrB = camera.worldToScreen({ to->x, to->y });
+                SDL_RenderDrawLine(renderer, scrA.x, scrA.y, scrB.x, scrB.y);
             }
         }
     }

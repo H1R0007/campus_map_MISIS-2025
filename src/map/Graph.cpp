@@ -15,7 +15,7 @@ bool Graph::loadFromJson(const std::string& path) {
         std::cerr << "nodes.json missing or empty. Starting with empty graph." << std::endl;
         nodes.clear();
         nextId = 1;
-       
+
         // Создаём базовый JSON { "nodes": [] }
         std::ofstream ofs(path);
         ofs << "{\n  \"nodes\": []\n}\n";
@@ -108,6 +108,16 @@ void Graph::addNode(int x, int y) {
     if (!jsonPath.empty()) {
         saveToJson(jsonPath);
     }
+}
+
+void Graph::loadNode(const std::string& id, int x, int y, const std::vector<std::string>& neighbors) {
+    Node node;
+    node.id = id;
+    node.x = x;
+    node.y = y;
+    node.neighbors = neighbors;
+
+    nodes[id] = node;
 }
 
 void Graph::removeLastNode() {
@@ -245,7 +255,7 @@ void Graph::undo() {
         removeNeighbor(act.nodeId, act.neighborId);
         break;
     }
-    case ActionType::RemoveNeighbor:{
+    case ActionType::RemoveNeighbor: {
         addNeighbor(act.nodeId, act.neighborId);
         break;
     }
@@ -275,7 +285,7 @@ void Graph::redo() {
         addNeighbor(act.nodeId, act.neighborId);
         break;
     }
-    case ActionType::RemoveNeighbor:{
+    case ActionType::RemoveNeighbor: {
         removeNeighbor(act.nodeId, act.neighborId);
         break;
     }

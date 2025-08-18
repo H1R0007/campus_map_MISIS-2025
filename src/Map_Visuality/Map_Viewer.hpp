@@ -4,6 +4,8 @@
 #include <SDL2/SDL_ttf.h>
 #include "../Camera/Camera.hpp"
 #include "../map/Graph.hpp"
+#include "../path_finder/path_finder.hpp"
+#include "../aliases/AliasManager.hpp"
 
 class MapViewer {
 public:
@@ -15,12 +17,18 @@ public:
     void renderOverlay();  // текст поверх
     void onWindowResized(int w, int h);
 
+    void buildPathFromAliases(const std::string& startName, const std::string& endName);
+
 private:
 
     Graph graph;
 
     bool debugDrawNodes = true;
     const Node* hoveredNode = nullptr;
+
+    std::string startNodeId;
+    std::string endNodeId;
+    std::vector<std::string> currentPath;
 
     std::string activeNodeId;
     bool neighborMode = false;
@@ -39,4 +47,10 @@ private:
     void loadMap(const char* path);
 
     Uint32 lastSaveTick = 0;
+
+    AliasManager aliasManager;
+
+    std::string inputFrom;
+    std::string inputTo;
+    bool editingFrom = true; // true = редактируем поле "откуда", false = "куда"
 };

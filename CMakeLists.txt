@@ -11,7 +11,9 @@ add_executable(campus_map
     src/Engine/Engine.cpp
     src/Camera/Camera.cpp
     src/map/Graph.cpp
-)
+    src/json_loader/json_loader.cpp
+    src/path_finder/path_finder.cpp
+ "src/aliases/AliasManager.cpp")
 
 option(USE_SDL_IMAGE "Use SDL2_image (PNG, JPG, etc.)" ON)
 option(USE_SDL_TTF   "Use SDL2_ttf (fonts)"            ON)
