@@ -19,8 +19,11 @@ namespace Config {
     constexpr float MIN_ZOOM = 0.5f;
     constexpr float MAX_ZOOM = 3.0f;
 
-    //путь к json
+    // !!! Путь к json (поменял nodef.json на правильное имя)
     constexpr const char* NODES_PATH = "assets/nodes.json";
+
+    // Путь к шрифту (чтобы было явно)
+    constexpr const char* FONT_PATH = "assets/fonts/Roboto-Regular.ttf";
 
     // compile‑time: какой билд
     constexpr bool BUILD_DEV = true;   // при релизе ставите false
@@ -32,7 +35,6 @@ namespace Config {
         if constexpr (BUILD_DEV) {
             DEV_MODE = !DEV_MODE;
         }
-        // если BUILD_DEV=false → просто ничего
     }
 
     inline void forceUserMode() {
