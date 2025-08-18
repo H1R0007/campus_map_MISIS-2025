@@ -47,7 +47,6 @@ _deps
 # =========================
 
 # skompilirovannie web dannie
-*.html
 *.js
 *.wasm
 *.data
