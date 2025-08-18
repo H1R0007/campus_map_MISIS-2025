@@ -84,6 +84,12 @@ void Engine::run() {
     }
 }
 
+void Engine::handleFrame() {
+    handleEvents();
+    render();
+    // без while и без SDL_Delay
+}
+
 Engine::~Engine() {
     delete mapViewer;
     SDL_DestroyRenderer(renderer);

@@ -11,6 +11,8 @@ public:
     void run();
     void stop() { isRunning = false; }  // Реализация inline
 
+    void handleFrame();
+
 private:
     SDL_Window* window;
     SDL_Renderer* renderer;
