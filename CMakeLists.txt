@@ -41,8 +41,12 @@ if (EMSCRIPTEN)
     list(APPEND EM_FLAGS "-sASSERTIONS=2" "-sSAFE_HEAP=1")
   endif()
   if (EXISTS "${CMAKE_SOURCE_DIR}/assets")
+    set_target_properties(campus_map PROPERTIES SUFFIX ".html")
+    set_target_properties(campus_map PROPERTIES OUTPUT_NAME "index")
+
     target_link_options(campus_map PRIVATE
-      "--preload-file" "${CMAKE_SOURCE_DIR}/assets@/assets"
+    "--shell-file=${CMAKE_SOURCE_DIR}/web_shell.html"
+    "--preload-file=${CMAKE_SOURCE_DIR}/assets@/assets"
     )
   endif()
   target_compile_options(campus_map PRIVATE ${EM_FLAGS})
