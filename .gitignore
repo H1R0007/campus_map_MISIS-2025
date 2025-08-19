@@ -3,10 +3,8 @@
 # =========================
 
 # ignoriruem binarniki
-/build/
-/build/win/
-/build/web/
-/out/
+build/
+out/
 
 # =========================
 # compilatori / instrumenti
@@ -49,7 +47,6 @@ _deps
 # =========================
 
 # skompilirovannie web dannie
-*.html
 *.js
 *.wasm
 *.data
