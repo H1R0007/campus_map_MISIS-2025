@@ -96,6 +96,37 @@ void MapViewer::renderOverlay() {
     SDL_RenderCopy(renderer, texTo, nullptr, &dstTo);
     SDL_DestroyTexture(texTo);
 
+    // Suggestions rendered at top-right corner
+    std::string currentInput = editingFrom ? inputFrom : inputTo;
+
+    // показываем подсказки только если пользователь что-то ввёл
+    currentSuggestions.clear();
+    if (!currentInput.empty()) {
+        currentSuggestions = aliasManager.suggest(currentInput, 3);
+    }
+
+    int winW, winH;
+    SDL_GetRendererOutputSize(renderer, &winW, &winH);
+
+    int baseX = winW - 250; // отступ справа
+    int baseY = 50;         // отступ сверху
+    int offset = 0;
+
+    for (int i = 0; i < (int)currentSuggestions.size(); i++) {
+        SDL_Color color = (i == selectedSuggestionIndex)
+            ? SDL_Color{ 200,0,0,255 }   // выделение красным
+        : SDL_Color{ 0,0,200,255 }; // обычные варианты – синим
+
+        SDL_Surface* surf = TTF_RenderText_Blended(font, currentSuggestions[i].c_str(), color);
+        SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, surf);
+        SDL_Rect dst{ baseX, baseY + offset, surf->w, surf->h };
+        SDL_FreeSurface(surf);
+        SDL_RenderCopy(renderer, tex, nullptr, &dst);
+        SDL_DestroyTexture(tex);
+
+        offset += 20;
+    }
+
     if (Config::DEV_MODE) {
         std::string help = "Alt + RMB = choose node | RMB = add node / stage neighbor | Enter = confirm | Esc = cancel | Ctrl + Z = undo | Ctrl + Y = redo | Ctrl + S = save";
         SDL_Color gray = { 80, 80, 80, 255 };
@@ -366,23 +397,61 @@ void MapViewer::handleEvent(SDL_Event& event) {
         }
     }
 
+    // --- USER/DEV: TEXT INPUT (autocomplete fields) ---
     if (event.type == SDL_TEXTINPUT) {
         if (editingFrom) inputFrom += event.text.text;
         else inputTo += event.text.text;
+        selectedSuggestionIndex = -1; // === NEW === Сброс выбора при наборе
     }
+
+    // --- USER/DEV: KEYBOARD control for input fields + suggestions ---
     if (event.type == SDL_KEYDOWN) {
         switch (event.key.keysym.sym) {
         case SDLK_TAB:
-            editingFrom = !editingFrom; // переключаем поле
+            editingFrom = !editingFrom;
+            selectedSuggestionIndex = -1; // сброс подсветки
             break;
+
         case SDLK_BACKSPACE:
             if (editingFrom && !inputFrom.empty()) inputFrom.pop_back();
             if (!editingFrom && !inputTo.empty()) inputTo.pop_back();
+
+            // === NEW: если поле стало пустым, чистим подсказки ===
+            if ((editingFrom && inputFrom.empty()) || (!editingFrom && inputTo.empty())) {
+                currentSuggestions.clear();
+                selectedSuggestionIndex = -1;
+            }
+            else {
+                selectedSuggestionIndex = -1; // если просто удалили часть — сброс выбора
+            }
             break;
+
+            // === NEW navigation in suggestions ===
+        case SDLK_DOWN:
+            if (!currentSuggestions.empty()) {
+                selectedSuggestionIndex++;
+                if (selectedSuggestionIndex >= (int)currentSuggestions.size())
+                    selectedSuggestionIndex = 0;
+            }
+            break;
+
+        case SDLK_UP:
+            if (!currentSuggestions.empty()) {
+                selectedSuggestionIndex--;
+                if (selectedSuggestionIndex < 0)
+                    selectedSuggestionIndex = (int)currentSuggestions.size() - 1;
+            }
+            break;
+
         case SDLK_RETURN:
         case SDLK_KP_ENTER:
-            if (!inputFrom.empty() && !inputTo.empty()) {
-                // пытаемся построить путь
+            if (!currentSuggestions.empty() && selectedSuggestionIndex >= 0) {
+                // подставляем выбранный alias
+                if (editingFrom) inputFrom = currentSuggestions[selectedSuggestionIndex];
+                else inputTo = currentSuggestions[selectedSuggestionIndex];
+                selectedSuggestionIndex = -1;
+            }
+            else if (!inputFrom.empty() && !inputTo.empty()) {
                 buildPathFromAliases(inputFrom, inputTo);
             }
             break;

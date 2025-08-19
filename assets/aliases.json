@@ -6,43 +6,43 @@
     },
     {
       "id": "node_1",
-      "name": "Вестибюль"
+      "name": "lobby"
     },
     {
       "id": "node_2",
-      "name": "Коридор левый"
+      "name": "left corridor"
     },
     {
       "id": "node_3",
-      "name": "aud 101"
+      "name": "room 101"
     },
     {
       "id": "node_4",
-      "name": "aud 102"
+      "name": "room 102"
     },
     {
       "id": "node_5",
-      "name": "aud 103"
+      "name": "room 103"
     },
     {
       "id": "node_6",
-      "name": "aud 104"
+      "name": "room 104"
     },
     {
       "id": "node_7",
-      "name": "Коридор правый"
+      "name": "right corridor"
     },
     {
       "id": "node_31",
-      "name": "Выход к библиотеке"
+      "name": "library exit"
     },
     {
       "id": "node_8",
-      "name": "Лестница на 2 этаж"
+      "name": "stairs to 2nd floor"
     },
     {
       "id": "node_100",
-      "name": "srabotai"
+      "name": "test point"
     }
   ]
 }

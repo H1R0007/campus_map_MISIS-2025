@@ -53,4 +53,7 @@ private:
     std::string inputFrom;
     std::string inputTo;
     bool editingFrom = true; // true = редактируем поле "откуда", false = "куда"
+    // === подсказки автокомплита ===
+    int selectedSuggestionIndex = -1;                  // какой вариант подсвечен (-1 = ничего)
+    std::vector<std::string> currentSuggestions;       // варианты от aliasManager
 };
