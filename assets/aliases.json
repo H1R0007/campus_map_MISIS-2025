@@ -1,0 +1,48 @@
+{
+  "aliases": [
+    {
+      "id": "node_38",
+      "name": "main entrance"
+    },
+    {
+      "id": "node_1",
+      "name": "lobby"
+    },
+    {
+      "id": "node_2",
+      "name": "left corridor"
+    },
+    {
+      "id": "node_3",
+      "name": "room 101"
+    },
+    {
+      "id": "node_4",
+      "name": "room 102"
+    },
+    {
+      "id": "node_5",
+      "name": "room 103"
+    },
+    {
+      "id": "node_6",
+      "name": "room 104"
+    },
+    {
+      "id": "node_7",
+      "name": "right corridor"
+    },
+    {
+      "id": "node_31",
+      "name": "library exit"
+    },
+    {
+      "id": "node_8",
+      "name": "stairs to 2nd floor"
+    },
+    {
+      "id": "node_100",
+      "name": "test point"
+    }
+  ]
+}

@@ -47,7 +47,6 @@ _deps
 # =========================
 
 # skompilirovannie web dannie
-*.html
 *.js
 *.wasm
 *.data
@@ -80,6 +79,3 @@ _deps
 # Windows sluzhebnie
 Thumbs.db
 ehthumbs.db
-
-#nlohmann 
-include/nlohmann/

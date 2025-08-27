@@ -1,57 +1,65 @@
-#include <path_finder/path_finder.hpp>
+#include "path_finder.hpp"
+#include <queue>
+#include <unordered_map>
+#include <limits>
+#include <cmath>
+#include <algorithm>
 
 
-// Штраф при смене этажа + евклидово пространство
-static float floor_count(int from_id, int to_id) {
-    const Node& from = nods_database[from_id];
-    const Node& to = nods_database[to_id];
+std::vector<std::string> find_shortest_path(
+    const std::string& start_id,
+    const std::string& end_id,
+    const std::unordered_map<std::string, Node>& nodes_database
+) {
 
-    float dx = from.x - to.x;
-    float dy = from.y - to.y;
-    float floorPenalty = (from.floor != to.floor) ? 50.0f : 0.0f;  // Штраф за переход между этажами
-
-    return std::sqrt(dx * dx + dy * dy) + floorPenalty;
-}
-
-std::vector<int> find_shortest_path(int start_id, int end_id) {
-    // Минимальное расстояние до точки "g"
-    std::unordered_map<int, float> g_length;
-    // Откуда пришли (для восстановления пути)
-    std::unordered_map<int, int> came_from;
-    // Приоритетная очередь: {f = g + h, point_id}
-    std::priority_queue<Point, std::vector<Point>, std::greater<>> open_set;
-
-    for (const auto& [id, _] : nodes_database) {
-        g_length[id] = std::numeric_limits<float>::infinity();
+    if (nodes_database.find(start_id) == nodes_database.end() ||
+        nodes_database.find(end_id) == nodes_database.end()) {
+        return {};
     }
-    g_length[start_id] = 0.0f;
-    open_set.push({ start_id, floor_count(start_id, end_id) });
+
+    std::unordered_map<std::string, float> g_score;
+    std::unordered_map<std::string, std::string> came_from;
+
+    for (auto& [id, _] : nodes_database) {
+        g_score[id] = std::numeric_limits<float>::infinity();
+    }
+    g_score[start_id] = 0.0f;
+
+    std::priority_queue<Point> open_set;
+    open_set.push({ start_id, heuristic(nodes_database.at(start_id), nodes_database.at(end_id)) });
 
     while (!open_set.empty()) {
-        Point current = open_set.top();
+        auto current = open_set.top().id;
         open_set.pop();
 
-        if (current.id == end_id) {
-            // Восстановление пути
-            std::vector<int> path;
-            for (int at = end_id; at != start_id; at = came_from[at]) {
+        if (current == end_id) {
+            std::vector<std::string> path;
+            for (std::string at = end_id; !at.empty(); at = came_from.count(at) ? came_from[at] : "") {
                 path.push_back(at);
+                if (at == start_id) break;
             }
-            path.push_back(start_id);
             std::reverse(path.begin(), path.end());
             return path;
         }
 
-        for (const auto& [neighbor_id, distance] : nodes_database[current.id].neighbors) {
-            float tentative_length = g_length[current.id] + distance;
-            if (tentative_length < g_length[neighbor_id]) {
-                came_from[neighbor_id] = current.id;
-                g_length[neighbor_id] = tentative_length;
-                float final_length = tentative_length + floor_count(neighbor_id, end_id);
-                open_set.push({ neighbor_id, final_length });
+        for (auto& neighbor_id : nodes_database.at(current).neighbors) {
+
+            if (nodes_database.find(neighbor_id) == nodes_database.end()) {
+                continue;
+            }
+
+            float tentative_g = g_score[current] +
+                heuristic(nodes_database.at(current), nodes_database.at(neighbor_id));
+
+            if (tentative_g < g_score[neighbor_id]) {
+                came_from[neighbor_id] = current;
+                g_score[neighbor_id] = tentative_g;
+
+                float f = tentative_g + heuristic(nodes_database.at(neighbor_id), nodes_database.at(end_id));
+                open_set.push({ neighbor_id, f });
             }
         }
     }
 
-    return {};  // Путь не найден
+    return {}; // путь не найден
 }
