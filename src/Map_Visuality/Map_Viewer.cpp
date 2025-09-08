@@ -172,6 +172,7 @@ void MapViewer::loadMap(const char* path) {
     }
     mapTexture = SDL_CreateTextureFromSurface(renderer, surface);
     SDL_FreeSurface(surface);
+
 }
 
 void MapViewer::handleEvent(SDL_Event& event) {

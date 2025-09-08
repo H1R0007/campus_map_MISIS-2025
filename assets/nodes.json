@@ -1,14 +1,7 @@
 {
     "nodes": [
         {
-            "id": "node_38",
-            "neighbors": [
-                "node_1"
-            ],
-            "x": 631,
-            "y": 1313
-        },
-        {
+            "floor": 0,
             "id": "node_1",
             "neighbors": [
                 "node_37",
@@ -982,144 +975,8 @@
         {
             "id": "node_126",
             "neighbors": [],
-            "x": 1187,
-            "y": 869
-        },
-        {
-            "id": "node_127",
-            "neighbors": [],
-            "x": 1187,
-            "y": 832
-        },
-        {
-            "id": "node_128",
-            "neighbors": [],
-            "x": 1208,
-            "y": 869
-        },
-        {
-            "id": "node_129",
-            "neighbors": [],
-            "x": 1260,
-            "y": 869
-        },
-        {
-            "id": "node_130",
-            "neighbors": [],
-            "x": 1259,
-            "y": 825
-        },
-        {
-            "id": "node_131",
-            "neighbors": [],
-            "x": 1258,
-            "y": 904
-        },
-        {
-            "id": "node_132",
-            "neighbors": [],
-            "x": 1297,
-            "y": 875
-        },
-        {
-            "id": "node_133",
-            "neighbors": [],
-            "x": 1312,
-            "y": 876
-        },
-        {
-            "id": "node_134",
-            "neighbors": [],
-            "x": 1320,
-            "y": 859
-        },
-        {
-            "id": "node_135",
-            "neighbors": [],
-            "x": 1317,
-            "y": 819
-        },
-        {
-            "id": "node_136",
-            "neighbors": [],
-            "x": 1313,
-            "y": 754
-        },
-        {
-            "id": "node_137",
-            "neighbors": [],
-            "x": 1006,
-            "y": 874
-        },
-        {
-            "id": "node_138",
-            "neighbors": [],
-            "x": 970,
-            "y": 874
-        },
-        {
-            "id": "node_139",
-            "neighbors": [],
-            "x": 969,
-            "y": 830
-        },
-        {
-            "id": "node_140",
-            "neighbors": [],
-            "x": 934,
-            "y": 869
-        },
-        {
-            "id": "node_141",
-            "neighbors": [],
-            "x": 886,
-            "y": 872
-        },
-        {
-            "id": "node_142",
-            "neighbors": [],
-            "x": 866,
-            "y": 871
-        },
-        {
-            "id": "node_147",
-            "neighbors": [
-                "node_31",
-                "node_58",
-                "node_148"
-            ],
-            "x": 225,
-            "y": 915
-        },
-        {
-            "id": "node_148",
-            "neighbors": [
-                "node_147",
-                "node_58",
-                "node_149"
-            ],
-            "x": 259,
-            "y": 791
-        },
-        {
-            "id": "node_149",
-            "neighbors": [
-                "node_148",
-                "node_58",
-                "node_150"
-            ],
-            "x": 374,
-            "y": 734
-        },
-        {
-            "id": "node_150",
-            "neighbors": [
-                "node_149",
-                "node_67",
-                "node_124"
-            ],
-            "x": 545,
-            "y": 727
+            "x": 905,
+            "y": 1331
         }
     ]
 }

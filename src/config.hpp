@@ -7,7 +7,7 @@ namespace Config {
     constexpr const char* WINDOW_TITLE = "Campus Map";
 
     // Карта
-    constexpr const char* MAP_PATH = "assets/Map.png";
+    constexpr const char* MAP_PATH = "assets/Building_B/floor_1.png";
     constexpr int MAP_WIDTH = 1476;
     constexpr int MAP_HEIGHT = 780;
 
@@ -40,4 +40,5 @@ namespace Config {
     inline void forceUserMode() {
         DEV_MODE = false;
     }
+
 }
