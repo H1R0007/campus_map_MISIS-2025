@@ -19,10 +19,11 @@ Graph JsonLoader::loadGraph(const std::string& filename) {
         std::string id = nodeData["id"];
         int x = nodeData["x"];
         int y = nodeData["y"];
+        int floor = nodeData.value("floor", 0); // если нет поля, то по умолчанию 0
 
         std::vector<std::string> neighbors = nodeData["neighbors"].get<std::vector<std::string>>();
 
-        graph.loadNode(id, x, y, neighbors);
+        graph.loadNode(id, x, y, floor, neighbors);
     }
 
     return graph;

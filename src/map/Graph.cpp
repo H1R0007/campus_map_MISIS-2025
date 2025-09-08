@@ -49,6 +49,7 @@ bool Graph::loadFromJson(const std::string& path) {
         node.id = n.value("id", "");
         node.x = n.value("x", 0);
         node.y = n.value("y", 0);
+        node.floor = n.value("floor", 0);   // <-- добавили этаж
 
         if (n.contains("neighbors")) {
             for (auto& nb : n["neighbors"])
@@ -79,6 +80,7 @@ bool Graph::saveToJson(const std::string& path) const {
             {"id", node.id},
             {"x", node.x},
             {"y", node.y},
+            {"floor", node.floor},  // <-- новое поле
             {"neighbors", node.neighbors}
             });
     }
@@ -88,20 +90,20 @@ bool Graph::saveToJson(const std::string& path) const {
         std::cerr << "Failed to save " << path << "\n";
         return false;
     }
-    file << j.dump(4); // красиво с отступами
+    file << j.dump(4);
     return true;
 }
 
-void Graph::addNode(int x, int y) {
+void Graph::addNode(int x, int y, int floor) {
     Node node;
     node.id = "node_" + std::to_string(nextId++);
     node.x = x;
     node.y = y;
+    node.floor = floor;  // <-- добавили этаж
 
     nodes[node.id] = node;
-    std::cout << "Added " << node.id << " at (" << x << "," << y << ")\n";
+    std::cout << "Added " << node.id << " at (" << x << "," << y << ", floor " << floor << ")\n";
 
-    // === Запоминаем в историю Undo ===
     Action act{ ActionType::AddNode, node, node.id, "" };
     pushAction(act);
 
@@ -110,13 +112,13 @@ void Graph::addNode(int x, int y) {
     }
 }
 
-void Graph::loadNode(const std::string& id, int x, int y, const std::vector<std::string>& neighbors) {
+void Graph::loadNode(const std::string& id, int x, int y, int floor, const std::vector<std::string>& neighbors) {
     Node node;
     node.id = id;
     node.x = x;
     node.y = y;
+    node.floor = floor;
     node.neighbors = neighbors;
-
     nodes[id] = node;
 }
 
