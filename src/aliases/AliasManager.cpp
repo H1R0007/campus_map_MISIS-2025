@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iostream>
 #include <algorithm>
+#include <unordered_set>
 
 using json = nlohmann::json;
 
@@ -37,9 +38,23 @@ bool AliasManager::load(const std::string& path) {
     aliasToId.clear();
     idToAliases.clear();
 
+    std::unordered_set<std::string> ids;
+
     for (auto& entry : j["aliases"]) {
+        if (!entry.contains("id") || !entry.contains("name")) {
+            std::cerr << "AliasManager: missing id or name\n";
+            continue;
+        }
+
         std::string id = entry.value("id", "");
         std::string name = entry.value("name", "");
+
+        if (ids.count(id)) {
+            std::cerr << "AliasManager: duplicate alias id " << id << "\n";
+            continue;
+        }
+        ids.insert(id);
+
         if (id.empty() || name.empty()) continue;
 
         std::string norm = normalize(name);
