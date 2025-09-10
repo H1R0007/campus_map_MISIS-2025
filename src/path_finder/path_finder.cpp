@@ -1,65 +1,81 @@
-#include "path_finder.hpp"
+п»ї#include "path_finder.hpp"
 #include <queue>
 #include <unordered_map>
 #include <limits>
 #include <cmath>
 #include <algorithm>
 
-// Эвристика A*: "примерная стоимость" от узла к цели
-// Учитываем этаж как Z-координату с фиксированной ценой за разницу этажей
+// Р­РІСЂРёСЃС‚РёРєР° A*: "РїСЂРёРјРµСЂРЅР°СЏ СЃС‚РѕРёРјРѕСЃС‚СЊ" РѕС‚ СѓР·Р»Р° Рє С†РµР»Рё
+// РЈС‡РёС‚С‹РІР°РµРј СЌС‚Р°Р¶ РєР°Рє Z-РєРѕРѕСЂРґРёРЅР°С‚Сѓ СЃ С„РёРєСЃРёСЂРѕРІР°РЅРЅРѕР№ С†РµРЅРѕР№ Р·Р° СЂР°Р·РЅРёС†Сѓ СЌС‚Р°Р¶РµР№
 static float heuristic(const Node& a, const Node& b) {
     float dx = float(a.x - b.x);
     float dy = float(a.y - b.y);
     int df = std::abs(a.floor - b.floor);
 
-    const float FLOOR_COST = 100.0f; // "цена" перехода между этажами
+    const float FLOOR_COST = 100.0f; // "С†РµРЅР°" РїРµСЂРµС…РѕРґР° РјРµР¶РґСѓ СЌС‚Р°Р¶Р°РјРё
     return std::sqrt(dx * dx + dy * dy + (df * FLOOR_COST) * (df * FLOOR_COST));
 }
 
-// Реальная стоимость ребра (от узла к соседу)
-// Тут различаем обычное перемещение по этажу и переход между этажами
-static float edge_cost(const Node& a, const Node& b) {
+static float edge_cost(const Node& a, const Node& b, const GraphManager& graphManager,
+    const PathFinderOptions& options)
+{
+    // РїСЂРѕРІРµСЂСЏРµРј: СЌС‚Рѕ transition РёР»Рё РѕР±С‹С‡РЅРѕРµ СЂРµР±СЂРѕ?
+    auto trType = graphManager.getTransitionType(a.id, b.id);
+    if (trType) {
+        // С„РёР»СЊС‚СЂР°С†РёСЏ
+        switch (*trType) {
+        case TransitionType::Stairs:
+            if (!options.allowStairs) return std::numeric_limits<float>::infinity();
+            return 100.0f;
+        case TransitionType::Lift:
+            if (!options.allowLift) return std::numeric_limits<float>::infinity();
+            return 10.0f;
+        case TransitionType::Bridge:
+            if (!options.allowBridge) return std::numeric_limits<float>::infinity();
+            return 20.0f;
+        case TransitionType::Door:
+            if (!options.allowDoor) return std::numeric_limits<float>::infinity();
+            return 1.0f;
+        default:
+            return 50.0f;
+        }
+    }
+
+    // РѕР±С‹С‡РЅС‹Р№ СЃРѕСЃРµРґ РІ С‚РѕРј Р¶Рµ РіСЂР°С„Рµ
     if (a.floor == b.floor) {
-        float dx = float(a.x - b.x);
-        float dy = float(a.y - b.y);
+        float dx = float(a.x - b.x), dy = float(a.y - b.y);
         return std::sqrt(dx * dx + dy * dy);
     }
-    else {
-        // фиксированная цена подъёма/спуска
-        return 100.0f;
-    }
+
+    // РїРµСЂРµС…РѕРґ Р±РµР· transitions (СЃС‚СЂР°РЅРЅРѕ, РЅРѕ РїСѓСЃС‚СЊ РѕС‡РµРЅСЊ РґРѕСЂРѕРіРѕР№)
+    return 1000.0f;
 }
 
 std::vector<std::string> find_shortest_path(
     const std::string& start_id,
     const std::string& end_id,
-    const std::unordered_map<std::string, Node>& nodes_database
+    const GraphManager& graphManager,
+    const PathFinderOptions& options
 ) {
-
-    if (nodes_database.find(start_id) == nodes_database.end() ||
-        nodes_database.find(end_id) == nodes_database.end()) {
+    if (graphManager.getNode(start_id) == nullptr ||
+        graphManager.getNode(end_id) == nullptr) {
         return {};
     }
 
     std::unordered_map<std::string, float> g_score;
     std::unordered_map<std::string, std::string> came_from;
 
-    // Инициализируем оценки расстояний
-    for (auto& [id, _] : nodes_database) {
-        g_score[id] = std::numeric_limits<float>::infinity();
-    }
     g_score[start_id] = 0.0f;
 
-    // Очередь открытых узлов (по f_score)
     std::priority_queue<Point> open_set;
-    open_set.push({ start_id, heuristic(nodes_database.at(start_id), nodes_database.at(end_id)) });
+    open_set.push({ start_id, heuristic(*graphManager.getNode(start_id),
+                                        *graphManager.getNode(end_id)) });
 
     while (!open_set.empty()) {
         auto current = open_set.top().id;
         open_set.pop();
 
         if (current == end_id) {
-            // Восстановим путь
             std::vector<std::string> path;
             for (std::string at = end_id; !at.empty(); at = came_from.count(at) ? came_from[at] : "") {
                 path.push_back(at);
@@ -69,26 +85,32 @@ std::vector<std::string> find_shortest_path(
             return path;
         }
 
-        for (auto& neighbor_id : nodes_database.at(current).neighbors) {
+        const Node* currentNode = graphManager.getNode(current);
+        if (!currentNode) continue;
 
-            if (nodes_database.find(neighbor_id) == nodes_database.end()) {
-                continue; // если сосед "битый"
+        for (auto& neighbor_id : graphManager.getNeighbors(current)) {
+            const Node* nbNode = graphManager.getNode(neighbor_id);
+            if (!nbNode) continue;
+
+            float cost = edge_cost(*currentNode, *nbNode, graphManager, options);
+            if (cost == std::numeric_limits<float>::infinity()) {
+                continue; // СЌС‚РѕС‚ РїРµСЂРµС…РѕРґ Р·Р°РїСЂРµС‰С‘РЅ
             }
 
-            float tentative_g = g_score[current] +
-                edge_cost(nodes_database.at(current), nodes_database.at(neighbor_id));
+            float tentative_g = g_score[current] + cost;
 
-            if (tentative_g < g_score[neighbor_id]) {
+            if (g_score.find(neighbor_id) == g_score.end() ||
+                tentative_g < g_score[neighbor_id]) {
                 came_from[neighbor_id] = current;
                 g_score[neighbor_id] = tentative_g;
 
                 float f = tentative_g +
-                    heuristic(nodes_database.at(neighbor_id), nodes_database.at(end_id));
+                    heuristic(*nbNode, *graphManager.getNode(end_id));
 
                 open_set.push({ neighbor_id, f });
             }
         }
     }
 
-    return {}; // путь не найден
+    return {}; // РїСѓС‚СЊ РЅРµ РЅР°Р№РґРµРЅ
 }
