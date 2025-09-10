@@ -3,9 +3,11 @@
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 #include "../Camera/Camera.hpp"
-#include "../map/Graph.hpp"
 #include "../path_finder/path_finder.hpp"
 #include "../aliases/AliasManager.hpp"
+#include "../map/GraphManager.hpp"
+
+enum class ViewMode { Campus, BuildingFloor };
 
 class MapViewer {
 public:
@@ -18,10 +20,11 @@ public:
     void onWindowResized(int w, int h);
 
     void buildPathFromAliases(const std::string& startName, const std::string& endName);
+    void switchToFloor(const std::string& buildingId, int floor);
 
 private:
 
-    Graph graph;
+    GraphManager graphManager;
 
     bool debugDrawNodes = true;
     const Node* hoveredNode = nullptr;
@@ -34,7 +37,9 @@ private:
     bool neighborMode = false;
     std::vector<std::string> pendingNeighbors;  // временные соседи
 
-    SDL_Texture* mapTexture;
+    std::string portalStartNode;
+
+    SDL_Texture* mapTexture = nullptr;
     SDL_Renderer* renderer;
     Camera camera;
     SDL_Point mapSize;
@@ -56,4 +61,13 @@ private:
     // === подсказки автокомплита ===
     int selectedSuggestionIndex = -1;                  // какой вариант подсвечен (-1 = ничего)
     std::vector<std::string> currentSuggestions;       // варианты от aliasManager
+
+
+    ViewMode currentView = ViewMode::Campus;
+    std::string currentBuilding;
+    int currentFloor = 0;
+
+    bool userAllowStairs = true;
+    bool userAllowLift = true;
+    bool userAllowBridge = true;
 };
