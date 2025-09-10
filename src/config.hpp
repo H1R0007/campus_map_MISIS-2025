@@ -7,7 +7,16 @@ namespace Config {
     constexpr const char* WINDOW_TITLE = "Campus Map";
 
     // Карта
-    constexpr const char* MAP_PATH = "assets/Building_B/floor_1.png";
+    // --- КАРТЫ ---
+    // Кампус
+    constexpr const char* CAMPUS_GRAPH_PATH = "assets/campus/graph.json";
+    constexpr const char* CAMPUS_META_PATH = "assets/campus/meta.json";
+    constexpr const char* CAMPUS_MAP_PATH = "assets/campus/map.png";
+
+    // Переходы (порталы)
+    constexpr const char* TRANSITIONS_PATH = "assets/transitions/transitions.json";
+
+
     constexpr int MAP_WIDTH = 1476;
     constexpr int MAP_HEIGHT = 780;
 
