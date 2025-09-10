@@ -1,0 +1,16 @@
+{
+  "building_id": "Building_C",
+  "name": "Corpus_C",
+  "floors": [
+    {
+      "floor": 1,
+      "map": "floor_1/map.png",
+      "graph": "floor_1/graph.json"
+    },
+    {
+      "floor": 2,
+      "map": "floor_2/map.png",
+      "graph": "floor_2/graph.json"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "nodes": [
+    {
+      "id": "C_1_ENTRY_1",
+      "x": 60,
+      "y": 60,
+      "building": "Building_C",
+      "floor": 1,
+      "isPortal": true,
+      "neighbors": [ "C_1_COR_1" ]
+    },
+    {
+      "id": "C_1_COR_1",
+      "x": 160,
+      "y": 70,
+      "building": "Building_C",
+      "floor": 1,
+      "isPortal": false,
+      "neighbors": [ "C_1_ENTRY_1", "C_1_ROOM_101", "C_1_STAIR_1" ]
+    },
+    {
+      "id": "C_1_ROOM_101",
+      "x": 260,
+      "y": 80,
+      "building": "Building_C",
+      "floor": 1,
+      "isPortal": false,
+      "neighbors": [ "C_1_COR_1" ]
+    },
+    {
+      "id": "C_1_STAIR_1",
+      "x": 180,
+      "y": 200,
+      "building": "Building_C",
+      "floor": 1,
+      "isPortal": true,
+      "neighbors": [ "C_1_COR_1" ]
+    }
+  ]
+}
