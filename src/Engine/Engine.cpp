@@ -23,7 +23,7 @@ Engine::Engine(const char* title, int w, int h) : isRunning(true) {
     );
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
-    mapViewer = new MapViewer(renderer, Config::MAP_PATH);
+    mapViewer = new MapViewer(renderer, Config::CAMPUS_MAP_PATH);
 }
 
 void Engine::handleEvents() {

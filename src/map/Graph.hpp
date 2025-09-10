@@ -5,21 +5,6 @@
 #include "Node.hpp"
 #include <regex>  
 
-// Тип действия для Undo/Redo
-enum class ActionType {
-    AddNode,
-    RemoveNode,
-    AddNeighbor,
-    RemoveNeighbor
-};
-
-struct Action {
-    ActionType type;
-    Node nodeCopy;                  // для Add/Remove node
-    std::string nodeId;             // основной ID
-    std::string neighborId;         // если AddNeighbor/RemoveNeighbor
-};
-
 class Graph {
 public:
     Graph() = default;
@@ -27,8 +12,6 @@ public:
     // Загрузка и сохранение графа
     bool loadFromJson(const std::string& path);
     bool saveToJson(const std::string& path) const;
-    void loadNode(const std::string& id, int x, int y, const std::vector<std::string>& neighbors);
-    void addNode(int x, int y);
 
     // Работа с узлами
     void addNode(int x, int y, int floor = 0);
@@ -38,33 +21,14 @@ public:
     const Node* getNode(const std::string& id) const;
     const std::unordered_map<std::string, Node>& getNodes() const { return nodes; }
     std::unordered_map<std::string, Node>& getNodesMutable() { return nodes; }
-    void addNodeAuto(int x, int y);
 
     // Работа с соседями
     void addNeighbor(const std::string& nodeId, const std::string& neighborId);
     void removeNeighbor(const std::string& nodeId, const std::string& neighborId);
 
-    // Undo/Redo
-    void undo();
-    void redo();
-
-    const Node* getNode(const std::string& id) const;
-    const std::unordered_map<std::string, Node>& getNodes() const { return nodes; }
-    std::unordered_map<std::string, Node>& getNodesMutable() { return nodes; }
-
 private:
     std::unordered_map<std::string, Node> nodes; // все узлы графа
     std::string jsonPath;                        // путь к JSON-файлу
     int nextId = 1;                              // счётчик для генерации id
-
-    // История изменений для Undo/Redo
-    std::vector<Action> undoStack;
-    std::vector<Action> redoStack;
-
-    // Вспомогательная функция добавления в стек Undo
-    void pushAction(const Action& act) {
-        undoStack.push_back(act);
-        redoStack.clear(); // сбрасываем Redo после нового действия
-    }
 };
 
