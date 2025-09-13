@@ -191,6 +191,57 @@ void MapViewer::renderOverlay() {
             SDL_DestroyTexture(tex);
         }
     }
+
+    // === Dev Node Inspector ===
+    // === Dev Node Inspector ===
+    if (Config::DEV_MODE && !inspectorNodeId.empty()) {
+        const Node* n = graphManager.getNode(inspectorNodeId);
+        if (n && font) {
+            int x0 = 20;
+            int y0 = 200; // позиция панели
+            SDL_Color black = { 0,0,0,255 };
+
+            auto drawLine = [&](const std::string& text, int dy) {
+                SDL_Surface* surf = TTF_RenderText_Blended(font, text.c_str(), black);
+                if (!surf) {
+                    std::cout << "TTF_RenderText_Blended failed: " << TTF_GetError() << "\n";
+                    return 0;
+                }
+                SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, surf);
+                if (!tex) {
+                    std::cout << "SDL_CreateTextureFromSurface failed: " << SDL_GetError() << "\n";
+                    SDL_FreeSurface(surf);
+                    return 0;
+                }
+                SDL_Rect dst{ x0, y0 + dy, surf->w, surf->h };
+                SDL_RenderCopy(renderer, tex, nullptr, &dst);
+                SDL_DestroyTexture(tex);
+                int h = surf->h;
+                SDL_FreeSurface(surf);
+                return h + 4;
+                };
+
+            int offset = 0;
+            offset += drawLine("Inspector:", offset);
+            offset += drawLine("ID: " + n->id, offset);
+            offset += drawLine("Building: " + n->building, offset);
+            offset += drawLine("Floor: " + std::to_string(n->floor), offset);
+
+            std::string coords = "Coords: (" + std::to_string(n->x)
+                + "," + std::to_string(n->y) + ")";
+            offset += drawLine(coords, offset);
+
+            offset += drawLine(std::string("Portal: ") + (n->isPortal ? "true" : "false"), offset);
+
+            offset += drawLine("Neighbors:", offset);
+            for (auto& nb : n->neighbors) {
+                offset += drawLine(" - " + nb, offset);
+            }
+        }
+        else {
+            std::cout << "Inspector: node not found or font failed: " << inspectorNodeId << "\n";
+        }
+    }
 }
 
 void MapViewer::loadMap(const char* path) {
@@ -290,6 +341,29 @@ void MapViewer::handleEvent(SDL_Event& event) {
                 endNodeId.clear();
                 currentPath.clear();
                 std::cout << "Sbros vibora tocheck\n";
+            }
+        }
+    }
+
+    if (Config::DEV_MODE && event.type == SDL_MOUSEBUTTONDOWN
+        && event.button.button == SDL_BUTTON_RIGHT) {
+        const Uint8* keys = SDL_GetKeyboardState(nullptr);
+        if (keys[SDL_SCANCODE_LCTRL]) {
+            std::string target;
+            const auto& nodesHere =
+                (currentView == ViewMode::Campus) ? graphManager.getCampusNodes()
+                : graphManager.getActiveNodes();
+            SDL_Point clickScreen{ event.button.x, event.button.y };
+            for (auto& [id, node] : nodesHere) {
+                SDL_Point scr = camera.worldToScreen({ node.x, node.y });
+                int dx = scr.x - clickScreen.x;
+                int dy = scr.y - clickScreen.y;
+                if (dx * dx + dy * dy <= 25) { target = id; break; }
+            }
+            if (!target.empty()) {
+                inspectorNodeId = target;
+                std::cout << "[Inspector] Selected node " << inspectorNodeId << "\n";
+                return;
             }
         }
     }

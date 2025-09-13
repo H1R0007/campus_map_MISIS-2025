@@ -70,4 +70,6 @@ private:
     bool userAllowStairs = true;
     bool userAllowLift = true;
     bool userAllowBridge = true;
+
+    std::string inspectorNodeId;
 };
