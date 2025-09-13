@@ -50,6 +50,8 @@ bool Graph::loadFromJson(const std::string& path) {
         node.x = n.value("x", 0);
         node.y = n.value("y", 0);
         node.floor = n.value("floor", 0);   // <-- добавили этаж
+        node.building = n.value("building", "");
+        node.isPortal = n.value("isPortal", false);
 
         if (n.contains("neighbors")) {
             for (auto& nb : n["neighbors"])
@@ -80,9 +82,11 @@ bool Graph::saveToJson(const std::string& path) const {
             {"id", node.id},
             {"x", node.x},
             {"y", node.y},
-            {"floor", node.floor},  // <-- новое поле
+            {"floor", node.floor},
+            {"building", node.building},
+            {"isPortal", node.isPortal},
             {"neighbors", node.neighbors}
-            });
+        });
     }
 
     std::ofstream file(path);
@@ -90,7 +94,7 @@ bool Graph::saveToJson(const std::string& path) const {
         std::cerr << "Failed to save " << path << "\n";
         return false;
     }
-    file << j.dump(4);
+    file << j.dump(4); // красиво с отступами
     return true;
 }
 
@@ -103,13 +107,6 @@ void Graph::addNode(int x, int y, int floor) {
 
     nodes[node.id] = node;
     std::cout << "Added " << node.id << " at (" << x << "," << y << ", floor " << floor << ")\n";
-
-    Action act{ ActionType::AddNode, node, node.id, "" };
-    pushAction(act);
-
-    if (!jsonPath.empty()) {
-        saveToJson(jsonPath);
-    }
 }
 
 void Graph::loadNode(const std::string& id, int x, int y, int floor, const std::vector<std::string>& neighbors) {
@@ -119,6 +116,7 @@ void Graph::loadNode(const std::string& id, int x, int y, int floor, const std::
     node.y = y;
     node.floor = floor;
     node.neighbors = neighbors;
+
     nodes[id] = node;
 }
 
@@ -186,11 +184,6 @@ void Graph::removeNodeById(const std::string& nodeId, bool trackHistory) {
         );
     }
     nodes.erase(it);
-
-    if (trackHistory) {
-        pushAction({ ActionType::RemoveNode, removed, nodeId, "" });
-    }
-    saveToJson(jsonPath);
 }
 
 void Graph::addNeighbor(const std::string& nodeId, const std::string& neighborId) {
@@ -206,8 +199,6 @@ void Graph::addNeighbor(const std::string& nodeId, const std::string& neighborId
         a.neighbors.push_back(neighborId);
     if (std::find(b.neighbors.begin(), b.neighbors.end(), nodeId) == b.neighbors.end())
         b.neighbors.push_back(nodeId);
-
-    pushAction({ ActionType::AddNeighbor, {}, nodeId, neighborId });
 
     saveToJson(jsonPath);
 }
@@ -229,69 +220,5 @@ void Graph::removeNeighbor(const std::string& nodeId, const std::string& neighbo
         b.neighbors.end()
     );
 
-    pushAction({ ActionType::RemoveNeighbor, {}, nodeId, neighborId });
-
-    saveToJson(jsonPath);
-}
-
-void Graph::undo() {
-    if (undoStack.empty()) {
-        std::cout << "Nothing to undo.\n";
-        return;
-    }
-    Action act = undoStack.back();
-    undoStack.pop_back();
-
-    switch (act.type) {
-    case ActionType::AddNode: {
-        // отменяем добавление → удаляем
-        removeNodeById(act.nodeId, false); // false = не пушить снова в undo
-        break;
-    }
-    case ActionType::RemoveNode: {
-        // восстановить удалённый
-        nodes[act.nodeCopy.id] = act.nodeCopy;
-        break;
-    }
-    case ActionType::AddNeighbor: {
-        removeNeighbor(act.nodeId, act.neighborId);
-        break;
-    }
-    case ActionType::RemoveNeighbor: {
-        addNeighbor(act.nodeId, act.neighborId);
-        break;
-    }
-    }
-    redoStack.push_back(act);
-    saveToJson(jsonPath);
-}
-
-void Graph::redo() {
-    if (redoStack.empty()) {
-        std::cout << "Nothing to redo.\n";
-        return;
-    }
-    Action act = redoStack.back();
-    redoStack.pop_back();
-
-    switch (act.type) {
-    case ActionType::AddNode: {
-        nodes[act.nodeCopy.id] = act.nodeCopy;
-        break;
-    }
-    case ActionType::RemoveNode: {
-        removeNodeById(act.nodeId, false);
-        break;
-    }
-    case ActionType::AddNeighbor: {
-        addNeighbor(act.nodeId, act.neighborId);
-        break;
-    }
-    case ActionType::RemoveNeighbor: {
-        removeNeighbor(act.nodeId, act.neighborId);
-        break;
-    }
-    }
-    undoStack.push_back(act);
     saveToJson(jsonPath);
 }
