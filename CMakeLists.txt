@@ -13,7 +13,7 @@ add_executable(campus_map
     src/map/Graph.cpp
     src/json_loader/json_loader.cpp
     src/path_finder/path_finder.cpp
- "src/aliases/AliasManager.cpp")
+ "src/aliases/AliasManager.cpp" "src/map/TransitionManager.cpp" "src/map/GraphManager.cpp" "src/map/MetaLoader.cpp" "src/history/HistoryManager.cpp")
 
 option(USE_SDL_IMAGE "Use SDL2_image (PNG, JPG, etc.)" ON)
 option(USE_SDL_TTF   "Use SDL2_ttf (fonts)"            ON)

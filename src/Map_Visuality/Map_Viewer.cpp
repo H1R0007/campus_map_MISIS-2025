@@ -4,15 +4,28 @@
 #include <string>
 #include <vector>
 
-
-MapViewer::MapViewer(SDL_Renderer* renderer, const char* mapPath)
-    : renderer(renderer), mapSize{ Config::MAP_WIDTH, Config::MAP_HEIGHT }
+MapViewer::MapViewer(SDL_Renderer* renderer, const char* /*mapPath*/)
+    : renderer(renderer), mapSize{ Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT }
 {
-    graph.loadFromJson(Config::NODES_PATH);
-    loadMap(mapPath);
+    // Загружаем граф кампуса + метаданные + переходы
+    graphManager.loadCampus(Config::CAMPUS_GRAPH_PATH);
+    graphManager.loadCampusMeta(Config::CAMPUS_META_PATH);
+    graphManager.loadTransitions(Config::TRANSITIONS_PATH);
+
+    // Начинаем с кампуса
+    currentView = ViewMode::Campus;
+    currentBuilding.clear();
+    currentFloor = 0;
+    graphManager.setActiveGraph("__campus");
+
+    // Начальная карта → campus map
+    mapTexture = nullptr;
+    loadMap(Config::CAMPUS_MAP_PATH);
+
+    // Алиасы
     aliasManager.load(Config::ALIASES_PATH);
 
-    // Центрируем карту внутри CANVAS
+    // Центрируем карту в Canvas
     mapRect.x = (Config::CANVAS_WIDTH - mapSize.x) / 2;
     mapRect.y = (Config::CANVAS_HEIGHT - mapSize.y) / 2;
     mapRect.w = mapSize.x;
@@ -20,7 +33,9 @@ MapViewer::MapViewer(SDL_Renderer* renderer, const char* mapPath)
 
     camera = Camera();
     camera.setWorldSize(Config::CANVAS_WIDTH, Config::CANVAS_HEIGHT);
-    font = TTF_OpenFont("assets/fonts/Roboto-Regular.ttf", 16);
+
+    // Шрифт
+    font = TTF_OpenFont(Config::FONT_PATH, 16);
     if (!font) {
         std::cerr << "Failed to load font: " << TTF_GetError() << std::endl;
     }
@@ -36,7 +51,12 @@ void MapViewer::buildPathFromAliases(const std::string& startName, const std::st
         return;
     }
 
-    currentPath = find_shortest_path(startId, endId, graph.getNodes());
+    PathFinderOptions opts;
+    opts.allowStairs = userAllowStairs;
+    opts.allowLift = userAllowLift;
+    opts.allowBridge = userAllowBridge;
+
+    currentPath = find_shortest_path(startId, endId, graphManager, opts);
 
     if (currentPath.empty()) {
         std::cout << "Путь не найден между " << startName << " и " << endName << "\n";
@@ -96,6 +116,25 @@ void MapViewer::renderOverlay() {
     SDL_RenderCopy(renderer, texTo, nullptr, &dstTo);
     SDL_DestroyTexture(texTo);
 
+    // === USER OPTIONS ===
+    std::string optsText = "Options: ";
+    optsText += "Stairs=";  optsText += (userAllowStairs ? "ON" : "OFF");
+    optsText += " | Lift="; optsText += (userAllowLift ? "ON" : "OFF");
+    optsText += " | Bridge="; optsText += (userAllowBridge ? "ON" : "OFF");
+
+    SDL_Color optColor = { 50, 50, 50, 255 };
+    SDL_Surface* surfOpts = TTF_RenderText_Blended(font, optsText.c_str(), optColor);
+    SDL_Texture* texOpts = SDL_CreateTextureFromSurface(renderer, surfOpts);
+
+    int winW, winH;
+    SDL_GetRendererOutputSize(renderer, &winW, &winH);
+
+    // позиция внизу справа
+    SDL_Rect dstOpts{ winW - surfOpts->w - 20, winH - surfOpts->h - 20, surfOpts->w, surfOpts->h };
+    SDL_FreeSurface(surfOpts);
+    SDL_RenderCopy(renderer, texOpts, nullptr, &dstOpts);
+    SDL_DestroyTexture(texOpts);
+
     // Suggestions rendered at top-right corner
     std::string currentInput = editingFrom ? inputFrom : inputTo;
 
@@ -105,10 +144,10 @@ void MapViewer::renderOverlay() {
         currentSuggestions = aliasManager.suggest(currentInput, 3);
     }
 
-    int winW, winH;
-    SDL_GetRendererOutputSize(renderer, &winW, &winH);
+    int winW1, winH1;
+    SDL_GetRendererOutputSize(renderer, &winW1, &winH1);
 
-    int baseX = winW - 250; // отступ справа
+    int baseX = winW1 - 250; // отступ справа
     int baseY = 50;         // отступ сверху
     int offset = 0;
 
@@ -128,16 +167,6 @@ void MapViewer::renderOverlay() {
     }
 
     if (Config::DEV_MODE) {
-        std::string help = "Alt + RMB = choose node | RMB = add node / stage neighbor | Enter = confirm | Esc = cancel | Ctrl + Z = undo | Ctrl + Y = redo | Ctrl + S = save";
-        SDL_Color gray = { 80, 80, 80, 255 };
-        SDL_Surface* surf = TTF_RenderText_Blended(font, help.c_str(), gray);
-        SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, surf);
-        int winW, winH;
-        SDL_GetRendererOutputSize(renderer, &winW, &winH);
-        SDL_Rect dst{ 10, winH - surf->h - 10, surf->w, surf->h };
-        SDL_FreeSurface(surf);
-        SDL_RenderCopy(renderer, tex, nullptr, &dst);
-        SDL_DestroyTexture(tex);
 
         // ---- сообщение о режиме добавления соседей ----
         if (neighborMode && !activeNodeId.empty()) {
@@ -162,62 +191,156 @@ void MapViewer::renderOverlay() {
             SDL_DestroyTexture(tex);
         }
     }
+    //Обработка для построения линий
+    if (Config::DEV_MODE && lineMode) {
+        std::string hint = lineStartSet ? "LineMode: click end point" : "LineMode: click start point";
+        SDL_Color green{ 0, 200, 0, 255 };
+        SDL_Surface* surf = TTF_RenderText_Blended(font, hint.c_str(), green);
+        SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, surf);
+        SDL_Rect dst{ 10, 140, surf->w, surf->h }; // чуть ниже поиска
+        SDL_FreeSurface(surf);
+        SDL_RenderCopy(renderer, tex, nullptr, &dst);
+        SDL_DestroyTexture(tex);
+    }
 }
 
 void MapViewer::loadMap(const char* path) {
+    if (mapTexture) {
+        SDL_DestroyTexture(mapTexture);
+        mapTexture = nullptr;
+    }
+
     SDL_Surface* surface = IMG_Load(path);
     if (!surface) {
-        std::cerr << "Failed to load map: " << IMG_GetError() << std::endl;
+        std::cerr << "Failed to load map: " << path
+            << " | SDL_image error: " << IMG_GetError() << std::endl;
         return;
     }
+
     mapTexture = SDL_CreateTextureFromSurface(renderer, surface);
+
+    mapSize.x = surface->w;
+    mapSize.y = surface->h;
+
+    mapRect.w = surface->w;
+    mapRect.h = surface->h;
+    mapRect.x = (Config::CANVAS_WIDTH - mapRect.w) / 2;
+    mapRect.y = (Config::CANVAS_HEIGHT - mapRect.h) / 2;
+
     SDL_FreeSurface(surface);
 
+    if (!mapTexture) {
+        std::cerr << "Failed to create texture " << SDL_GetError() << std::endl;
+    }
+}
+
+void MapViewer::switchToFloor(const std::string& buildingId, int floor) {
+    const BuildingMeta* bm = graphManager.getBuildingMeta(buildingId);
+    if (!bm) return;
+
+    for (auto& f : bm->floors) {
+        if (f.floor == floor) {
+            currentView = ViewMode::BuildingFloor;
+            currentBuilding = buildingId;
+            currentFloor = f.floor;
+
+            graphManager.setActiveGraph(buildingId + "_floor_" + std::to_string(f.floor));
+            loadMap(("assets/buildings/" + bm->id + "/" + f.mapPath).c_str());
+
+            std::cout << "Switched to " << bm->name << " floor " << floor << "\n";
+            return;
+        }
+    }
+    std::cout << "Floor " << floor << " not found in building " << buildingId << "\n";
 }
 
 void MapViewer::handleEvent(SDL_Event& event) {
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT && Config::DEV_MODE) {
-        SDL_Point clickScreen{ event.button.x, event.button.y };
-        SDL_Point clickWorld = camera.screenToWorld(clickScreen);
+        if (Config::DEV_MODE && lineMode) {
+            //Код для прямых линий
+            SDL_Point clickWorld = camera.screenToWorld({ event.button.x, event.button.y });
 
-        std::string clickedId;
-
-        // Находим ближайший узел
-        for (auto& [id, node] : graph.getNodes()) {
-            SDL_Point scr = camera.worldToScreen({ node.x, node.y });
-            int dx = scr.x - clickScreen.x;
-            int dy = scr.y - clickScreen.y;
-            if (dx * dx + dy * dy <= 25) { // радиус 5px
-                clickedId = id;
-                break;
-            }
-        }
-
-        if (!clickedId.empty()) {
-            if (startNodeId.empty()) {
-                startNodeId = clickedId;
-                std::cout << "Start selected: " << startNodeId << "\n";
-            }
-            else if (endNodeId.empty()) {
-                endNodeId = clickedId;
-                std::cout << "End selected: " << endNodeId << "\n";
-
-                // Запуск алгоритма
-                currentPath = find_shortest_path(startNodeId, endNodeId, graph.getNodes());
-
-                if (currentPath.empty()) {
-                    std::cout << "Путь не найден!\n";
-                }
-                else {
-                    std::cout << "Путь рассчитан: " << currentPath.size() << " шагов\n";
-                }
+            if (!lineStartSet) {
+                lineStart = clickWorld;
+                lineStartSet = true;
+                std::cout << "Line start set at (" << lineStart.x << "," << lineStart.y << ")\n";
             }
             else {
-                // Сброс, если выбрали снова (третьим кликом)
-                startNodeId.clear();
-                endNodeId.clear();
-                currentPath.clear();
-                std::cout << "Сброс выбора точек\n";
+                float dx = clickWorld.x - lineStart.x;
+                float dy = clickWorld.y - lineStart.y;
+                float angleDeg = atan2f(dy, dx) * 180.0f / M_PI;
+                float length = std::sqrt(dx * dx + dy * dy);
+
+                int spacing = std::max(Config::LINE_POINT_SPACING, Config::LINE_POINT_MIN_SPACING);
+
+                // Считаем количество точек
+                int count = (int)(length / spacing);
+
+                // Ограничение сверху
+                count = std::min(count, Config::LINE_POINT_MAX_COUNT);
+
+
+                if (count > 0) {
+                    graphManager.addLinearNodes(lineStart.x, lineStart.y, angleDeg, count, currentFloor);
+                    std::cout << "Line finished → created " << count << " nodes\n";
+                }
+                else {
+                    std::cout << "Line too short, no nodes created.\n";
+                }
+
+                lineMode = false;
+                lineStartSet = false;
+            }
+
+            return;
+        }
+        if (Config::DEV_MODE) {
+            SDL_Point clickScreen{ event.button.x, event.button.y };
+            SDL_Point clickWorld = camera.screenToWorld(clickScreen);
+
+            std::string clickedId;
+
+            const auto& nodesHere =
+                (currentView == ViewMode::Campus) ? graphManager.getCampusNodes()
+                : graphManager.getActiveNodes();
+
+            // Находим ближайший узел
+            for (auto& [id, node] : nodesHere) {
+                SDL_Point scr = camera.worldToScreen({ node.x, node.y });
+                int dx = scr.x - clickScreen.x;
+                int dy = scr.y - clickScreen.y;
+                if (dx * dx + dy * dy <= 25) {
+                    clickedId = id;
+                    break;
+                }
+            }
+
+            if (!clickedId.empty()) {
+                if (startNodeId.empty()) {
+                    startNodeId = clickedId;
+                    std::cout << "Start selected: " << startNodeId << "\n";
+                }
+                else if (endNodeId.empty()) {
+                    endNodeId = clickedId;
+                    std::cout << "End selected: " << endNodeId << "\n";
+
+                    // Запуск алгоритма
+                    currentPath = find_shortest_path(startNodeId, endNodeId, graphManager);
+
+                    if (currentPath.empty()) {
+                        std::cout << "Path not found!\n";
+                    }
+                    else {
+                        std::cout << "Path has: " << currentPath.size() << " steps\n";
+                    }
+                }
+                else {
+                    // Сброс, если выбрали снова (третьим кликом)
+                    startNodeId.clear();
+                    endNodeId.clear();
+                    currentPath.clear();
+                    std::cout << "Sbros vibora tocheck\n";
+                }
             }
         }
     }
@@ -248,13 +371,15 @@ void MapViewer::handleEvent(SDL_Event& event) {
 
         if (Config::DEV_MODE) {
             hoveredNode = nullptr;
-            for (auto& [id, node] : graph.getNodes()) {
-                SDL_Point world{ node.x, node.y };
-                SDL_Point scr = camera.worldToScreen(world);
+            const auto& nodesHere =
+                (currentView == ViewMode::Campus) ? graphManager.getCampusNodes()
+                : graphManager.getActiveNodes();
 
+            for (auto& [id, node] : nodesHere) {
+                SDL_Point scr = camera.worldToScreen({ node.x, node.y });
                 int dx = scr.x - event.motion.x;
                 int dy = scr.y - event.motion.y;
-                if (dx * dx + dy * dy <= 25) { // радиус ~5px
+                if (dx * dx + dy * dy <= 25) {
                     hoveredNode = &node;
                     break;
                 }
@@ -272,66 +397,105 @@ void MapViewer::handleEvent(SDL_Event& event) {
             // ====== SHIFT + ПКМ ======
             // Удаление (узла или staged-соседа в neighborMode)
             if (keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT]) {
-                std::string targetNodeId;
-
-                // Находим узел под курсором
-                for (auto& [id, node] : graph.getNodes()) {
+                std::string target;
+                const auto& nodesHere =
+                    (currentView == ViewMode::Campus) ? graphManager.getCampusNodes()
+                    : graphManager.getActiveNodes();
+                for (auto& [id, node] : nodesHere) {
                     SDL_Point scr = camera.worldToScreen({ node.x, node.y });
                     int dx = scr.x - clickScreen.x;
                     int dy = scr.y - clickScreen.y;
-                    if (dx * dx + dy * dy <= 25) {
-                        targetNodeId = id;
-                        break;
-                    }
+                    if (dx * dx + dy * dy <= 25) { target = id; break; }
                 }
-
-                if (!targetNodeId.empty()) {
-                    if (neighborMode && !activeNodeId.empty() && activeNodeId != targetNodeId) {
-                        // --- Удаляем staged соседа из pendingNeighbors ---
+                if (!target.empty()) {
+                    // Если в режиме добавления соседей — сперва проверим staged list
+                    if (neighborMode && !activeNodeId.empty() && activeNodeId != target) {
                         auto it = std::find(pendingNeighbors.begin(),
-                            pendingNeighbors.end(),
-                            targetNodeId);
+                            pendingNeighbors.end(), target);
                         if (it != pendingNeighbors.end()) {
                             pendingNeighbors.erase(it);
                             std::cout << "Removed staged neighbor "
-                                << targetNodeId << " from " << activeNodeId << "\n";
+                                << target << " from " << activeNodeId << "\n";
                         }
                         else {
-                            std::cout << "No staged edge between "
-                                << activeNodeId << " and " << targetNodeId
-                                << " to remove\n";
+                            // Если не staged, то удаляем существующее ребро
+                            graphManager.removeNeighbor(activeNodeId, target);
+                            std::cout << "Removed edge between "
+                                << activeNodeId << " and " << target << "\n";
                         }
                     }
                     else {
-                        // --- Удаляем сам узел (если не в режиме соседа) ---
-                        std::cout << "Removing node " << targetNodeId << "\n";
-                        graph.removeNodeById(targetNodeId);
+                        // Если не neighborMode — обычное удаление узла
+                        std::cout << "Removing node " << target << "\n";
+                        graphManager.removeNodeById(target);
                     }
-                    return; // обработали Shift+ПКМ
                 }
+                return;
             }
 
             // ====== ALT + ПКМ ======
-            // Выбор активного узла → начало neighborMode
+            // ALT+ПКМ → neighborMode или портал‑завершение
             if (keys[SDL_SCANCODE_LALT] || keys[SDL_SCANCODE_RALT]) {
-                for (auto& [id, node] : graph.getNodesMutable()) {
+                std::string target;
+                const auto& nodesHere =
+                    (currentView == ViewMode::Campus) ? graphManager.getCampusNodes()
+                    : graphManager.getActiveNodes();
+                for (auto& [id, node] : nodesHere) {
                     SDL_Point scr = camera.worldToScreen({ node.x, node.y });
                     int dx = scr.x - clickScreen.x;
                     int dy = scr.y - clickScreen.y;
-                    if (dx * dx + dy * dy <= 25) {
-                        activeNodeId = id;
+                    if (dx * dx + dy * dy <= 25) { target = id; break; }
+                }
+                if (!target.empty()) {
+                    if (!portalStartNode.empty() && portalStartNode != target) {
+                        // Завершение портала
+                        Transition tr{ portalStartNode, target, TransitionType::Door };
+                        graphManager.addTransition(tr);
+                        std::cout << "Portal created: " << portalStartNode << " <-> " << target << "\n";
+                        portalStartNode.clear();
+                    }
+                    else {
+                        // Enter neighborMode
+                        activeNodeId = target;
                         neighborMode = true;
                         pendingNeighbors.clear();
-                        std::cout << "Neighbor mode started for " << id << "\n";
-                        return;
+                        std::cout << "Neighbor mode started for " << target << "\n";
+                    }
+                    return;
+                }
+            }
+
+            // P + ЛКМ → редактирование порталов
+            if (keys[SDL_SCANCODE_P]) {
+                std::string target;
+                const auto& nodesHere =
+                    (currentView == ViewMode::Campus) ? graphManager.getCampusNodes()
+                    : graphManager.getActiveNodes();
+                for (auto& [id, node] : nodesHere) {
+                    SDL_Point scr = camera.worldToScreen({ node.x, node.y });
+                    int dx = scr.x - clickScreen.x;
+                    int dy = scr.y - clickScreen.y;
+                    if (dx * dx + dy * dy <= 25) { target = id; break; }
+                }
+                if (!target.empty()) {
+                    if (portalStartNode.empty()) {
+                        portalStartNode = target;
+                        std::cout << "Portal start: " << portalStartNode << "\n";
+                    }
+                    else {
+                        Transition tr{ portalStartNode, target, TransitionType::Door };
+                        graphManager.addTransition(tr);
+                        std::cout << "Portal created: " << portalStartNode << " <-> " << target << "\n";
+                        portalStartNode.clear();
                     }
                 }
+                return;
             }
 
             // ====== ПКМ (в neighborMode) ======
             // Добавление staged соседа
             if (neighborMode && !activeNodeId.empty()) {
-                for (auto& [id, node] : graph.getNodesMutable()) {
+                for (auto& [id, node] : graphManager.getActiveNodesMutable()) {
                     SDL_Point scr = camera.worldToScreen({ node.x, node.y });
                     int dx = scr.x - clickScreen.x;
                     int dy = scr.y - clickScreen.y;
@@ -348,7 +512,7 @@ void MapViewer::handleEvent(SDL_Event& event) {
 
             // ====== Обычный ПКМ ======
             // Создать новый узел
-            graph.addNode(clickWorld.x, clickWorld.y);
+            graphManager.addNode(clickWorld.x, clickWorld.y);
         }
     }
 
@@ -358,7 +522,7 @@ void MapViewer::handleEvent(SDL_Event& event) {
                 if (neighborMode && !activeNodeId.empty()) {
                     // Подтверждаем все staged соседи
                     for (auto& nb : pendingNeighbors) {
-                        graph.addNeighbor(activeNodeId, nb);
+                        graphManager.addNeighbor(activeNodeId, nb);
                     }
 
                     std::cout << "Neighbor mode ended for "
@@ -372,6 +536,57 @@ void MapViewer::handleEvent(SDL_Event& event) {
                 pendingNeighbors.clear();
             }
 
+            // TAB → переключить Campus <-> последний корпус
+            if (event.key.keysym.sym == SDLK_TAB) {
+                if (currentView == ViewMode::Campus) {
+                    // Если раньше был выбран корпус — вернуться туда
+                    if (!currentBuilding.empty())
+                        switchToFloor(currentBuilding, currentFloor);
+                }
+                else {
+                    currentView = ViewMode::Campus;
+                    graphManager.setActiveGraph("__campus");
+                    loadMap(Config::CAMPUS_MAP_PATH);
+                    std::cout << "Switched to CAMPUS\n";
+                }
+            }
+            if (event.key.keysym.sym == SDLK_LEFT) {
+                if (currentBuilding == "Building_C") switchToFloor("Building_B", 1);
+                else if (currentBuilding == "Building_B") switchToFloor("Building_A", 1);
+                else switchToFloor("Building_C", 1);
+            }
+            if (event.key.keysym.sym == SDLK_UP) {
+                const BuildingMeta* bm = graphManager.getBuildingMeta(currentBuilding);
+                if (bm) {
+                    for (int i = 0; i < (int)bm->floors.size(); i++) {
+                        if (bm->floors[i].floor == currentFloor && i + 1 < (int)bm->floors.size()) {
+                            switchToFloor(currentBuilding, bm->floors[i + 1].floor);
+                            break;
+                        }
+                    }
+                }
+            }
+            if (event.key.keysym.sym == SDLK_DOWN) {
+                const BuildingMeta* bm = graphManager.getBuildingMeta(currentBuilding);
+                if (bm) {
+                    for (int i = 0; i < (int)bm->floors.size(); i++) {
+                        if (bm->floors[i].floor == currentFloor && i > 0) {
+                            switchToFloor(currentBuilding, bm->floors[i - 1].floor);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // L - для черчения прямых линий под определенным углом
+            if (Config::DEV_MODE && event.type == SDL_KEYDOWN) {
+                if (event.key.keysym.sym == SDLK_l) {
+                    lineMode = !lineMode;
+                    lineStartSet = false;
+                    std::cout << (lineMode ? "Line mode ENABLED" : "Line mode DISABLED") << "\n";
+                }
+            }
+
             if (event.key.keysym.sym == SDLK_ESCAPE) {
                 std::cout << "Neighbor mode cancelled for " << activeNodeId
                     << ", discarded " << pendingNeighbors.size() << " staged neighbors\n";
@@ -382,20 +597,37 @@ void MapViewer::handleEvent(SDL_Event& event) {
 
             if ((event.key.keysym.sym == SDLK_z) && (SDL_GetModState() & KMOD_CTRL)) {
                 std::cout << "CTRL+Z Undo\n";
-                if (Config::DEV_MODE) graph.undo();
+                if (Config::DEV_MODE) graphManager.undoGlobal();
             }
             if ((event.key.keysym.sym == SDLK_y) && (SDL_GetModState() & KMOD_CTRL)) {
                 std::cout << "CTRL+Y Redo\n";
-                if (Config::DEV_MODE) graph.redo();
+                if (Config::DEV_MODE) graphManager.redoGlobal();
             }
             if ((event.key.keysym.sym == SDLK_s) && (SDL_GetModState() & KMOD_CTRL)) {
                 if (Config::DEV_MODE) {
                     std::cout << "CTRL+S QuickSave\n";
                     lastSaveTick = SDL_GetTicks(); // запомнить время сохранения
-                    graph.saveToJson("Config::NODES_PATH");
+                    graphManager.saveActive();
+                }
+            }
+            if ((event.key.keysym.sym == SDLK_s) && (SDL_GetModState() & KMOD_CTRL)) {
+                if (SDL_GetModState() & KMOD_SHIFT) {
+                    // СохраняемTransitions
+                    std::cout << "CTRL+SHIFT+S Save transitions\n";
+                    graphManager.saveTransitions("assets/transitions/transitions.json");
+                } else {
+                    std::cout << "CTRL+S Save graph\n";
+                    graphManager.saveActive();
                 }
             }
         }
+    }
+
+    // Стрелки для переключения корпусов и этажей
+    if (event.key.keysym.sym == SDLK_RIGHT) {
+        if (currentBuilding == "Building_A") switchToFloor("Building_B", 1);
+        else if (currentBuilding == "Building_B") switchToFloor("Building_C", 1);
+        else switchToFloor("Building_A", 1);
     }
 
     // --- USER/DEV: TEXT INPUT (autocomplete fields) ---
@@ -457,6 +689,19 @@ void MapViewer::handleEvent(SDL_Event& event) {
             }
             break;
         }
+
+        if (event.key.keysym.sym == SDLK_8) {
+            userAllowStairs = !userAllowStairs;
+            std::cout << "Option: allowStairs = " << userAllowStairs << "\n";
+        }
+        if (event.key.keysym.sym == SDLK_9) {
+            userAllowLift = !userAllowLift;
+            std::cout << "Option: allowLift = " << userAllowLift << "\n";
+        }
+        if (event.key.keysym.sym == SDLK_0) {
+            userAllowBridge = !userAllowBridge;
+            std::cout << "Option: allowBridge = " << userAllowBridge << "\n";
+        }
     }
 }
 
@@ -492,6 +737,12 @@ void MapViewer::render() {
 
         SDL_RenderCopy(renderer, mapTexture, &srcRect, &destRect);
     }
+
+    const auto& nodesToRender =
+        (currentView == ViewMode::Campus)
+        ? graphManager.getCampusNodes()
+        : graphManager.getActiveNodes();
+
     // ======== Всё ниже — только для DEV_MODE ========
     if (Config::DEV_MODE) {
         SDL_SetRenderDrawColor(renderer, 220, 220, 220, 255);
@@ -534,10 +785,10 @@ void MapViewer::render() {
     if (Config::DEV_MODE) {
         // 1) Постоянные рёбра (серые)
         SDL_SetRenderDrawColor(renderer, 150, 150, 150, 255);
-        for (auto& [id, node] : graph.getNodes()) {
+        for (auto& [id, node] : nodesToRender) {
             SDL_Point src = camera.worldToScreen({ node.x, node.y });
             for (auto& nbId : node.neighbors) {
-                auto nbPtr = graph.getNode(nbId);
+                const Node* nbPtr = graphManager.getNode(nbId);
                 if (nbPtr && id < nbId) {
                     SDL_Point dst = camera.worldToScreen({ nbPtr->x, nbPtr->y });
                     SDL_RenderDrawLine(renderer, src.x, src.y, dst.x, dst.y);
@@ -547,12 +798,12 @@ void MapViewer::render() {
 
         // 2) Временные рёбра (жёлтые)
         if (neighborMode && !activeNodeId.empty()) {
-            auto activeNode = graph.getNode(activeNodeId);
+            auto activeNode = graphManager.getNode(activeNodeId);
             if (activeNode) {
                 SDL_Point src = camera.worldToScreen({ activeNode->x, activeNode->y });
                 SDL_SetRenderDrawColor(renderer, 200, 200, 0, 255);
                 for (auto& nbId : pendingNeighbors) {
-                    auto nbPtr = graph.getNode(nbId);
+                    auto nbPtr = graphManager.getNode(nbId);
                     if (nbPtr) {
                         SDL_Point dst = camera.worldToScreen({ nbPtr->x, nbPtr->y });
                         SDL_RenderDrawLine(renderer, src.x, src.y, dst.x, dst.y);
@@ -561,9 +812,20 @@ void MapViewer::render() {
             }
         }
 
+        // ПОРТАЛ (линия от выбранного первого узла)
+        if (!portalStartNode.empty()) {
+            const Node* p = graphManager.getNode(portalStartNode);
+            if (p) {
+                SDL_Point scr = camera.worldToScreen({ p->x, p->y });
+                SDL_SetRenderDrawColor(renderer, 0, 200, 200, 255);
+                SDL_Rect border{ scr.x - 6, scr.y - 6, 12, 12 };
+                SDL_RenderDrawRect(renderer, &border);
+            }
+        }
+
         // 3) Узлы (зелёный активный, красные остальные, hover — синий контур)
         if (debugDrawNodes) {
-            for (auto& [id, node] : graph.getNodes()) {
+            for (auto& [id, node] : nodesToRender) {
                 SDL_Point scr = camera.worldToScreen({ node.x, node.y });
                 SDL_Rect rect{ scr.x - 3, scr.y - 3, 6, 6 };
 
@@ -597,11 +859,31 @@ void MapViewer::render() {
 
     // ====== Отрисовка найденного пути ======
     if (!currentPath.empty()) {
-        SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // синий путь
+        SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
+
         for (size_t i = 1; i < currentPath.size(); i++) {
-            auto* from = graph.getNode(currentPath[i - 1]);
-            auto* to = graph.getNode(currentPath[i]);
-            if (from && to) {
+            const Node* from = graphManager.getNode(currentPath[i - 1]);
+            const Node* to = graphManager.getNode(currentPath[i]);
+            if (!from || !to) continue;
+
+            bool shouldDraw = false;
+
+            // Правило фильтрации
+            if (currentView == ViewMode::Campus) {
+                // оба узла должны принадлежать кампусу
+                if (currentView == ViewMode::Campus) {
+                    if (from->building == "CAMPUS" && to->building == "CAMPUS")
+                        shouldDraw = true;
+                }
+            }
+            else if (currentView == ViewMode::BuildingFloor) {
+                // оба узла должны принадлежать текущему корпусу и этажу
+                if (from->building == currentBuilding && to->building == currentBuilding &&
+                    from->floor == currentFloor && to->floor == currentFloor)
+                    shouldDraw = true;
+            }
+
+            if (shouldDraw) {
                 SDL_Point scrA = camera.worldToScreen({ from->x, from->y });
                 SDL_Point scrB = camera.worldToScreen({ to->x, to->y });
                 SDL_RenderDrawLine(renderer, scrA.x, scrA.y, scrB.x, scrB.y);
