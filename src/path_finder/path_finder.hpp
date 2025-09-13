@@ -2,7 +2,8 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include "../map/Node.hpp"  // Здесь должен быть твой struct Node с полем floor
+#include "../map/Node.hpp"
+#include "../map/GraphManager.hpp"
 
 // Структура элемента для очереди с приоритетом (для A*)
 struct Point {
@@ -15,9 +16,19 @@ struct Point {
     }
 };
 
+struct PathFinderOptions {
+    bool allowStairs = true;
+    bool allowLift = true;
+    bool allowBridge = true;
+    bool allowDoor = true;
+};
+
 // Главная функция поиска пути
 std::vector<std::string> find_shortest_path(
     const std::string& start_id,
     const std::string& end_id,
-    const std::unordered_map<std::string, Node>& nodes_database
+    const GraphManager& graphManager,
+    const PathFinderOptions& options = {}
 );
+
+static float heuristic(const Node& a, const Node& b);
