@@ -6,6 +6,7 @@
 
 using json = nlohmann::json;
 
+// === I/O ===
 bool Graph::loadFromJson(const std::string& path) {
     jsonPath = path;
 
@@ -98,6 +99,7 @@ bool Graph::saveToJson(const std::string& path) const {
     return true;
 }
 
+// === Node operations ===
 void Graph::addNode(int x, int y, int floor) {
     Node node;
     node.id = "node_" + std::to_string(nextId++);
@@ -163,13 +165,6 @@ void Graph::removeLastNode() {
     }
 }
 
-const Node* Graph::getNode(const std::string& id) const {
-    auto it = nodes.find(id);
-    if (it != nodes.end())
-        return &it->second;
-    return nullptr;
-}
-
 void Graph::removeNodeById(const std::string& nodeId, bool trackHistory) {
     auto it = nodes.find(nodeId);
     if (it == nodes.end()) return;
@@ -186,6 +181,14 @@ void Graph::removeNodeById(const std::string& nodeId, bool trackHistory) {
     nodes.erase(it);
 }
 
+const Node* Graph::getNode(const std::string& id) const {
+    auto it = nodes.find(id);
+    if (it != nodes.end())
+        return &it->second;
+    return nullptr;
+}
+
+// === Neighbor operations ===
 void Graph::addNeighbor(const std::string& nodeId, const std::string& neighborId) {
     if (nodeId == neighborId) return; // не связываем с самим собой
     auto itA = nodes.find(nodeId);

@@ -1,6 +1,7 @@
 ﻿#include "Camera.hpp"
 #include <algorithm>
 
+// === Constructor ===
 Camera::Camera()
     : viewport{ 0, 0, Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT },
     scale(1.0f),
@@ -10,6 +11,7 @@ Camera::Camera()
     centerOnCanvas();
 }
 
+// === Viewport & World size ===
 void Camera::setWorldSize(int width, int height) {
     worldWidth = width;
     worldHeight = height;
@@ -22,6 +24,7 @@ void Camera::setViewportSize(int w, int h) {
     clampViewport();
 }
 
+// === Scale / Zoom ===
 void Camera::setScale(float newScale) {
     scale = std::clamp(newScale, Config::MIN_ZOOM, Config::MAX_ZOOM);
     update();
@@ -54,6 +57,7 @@ void Camera::zoom(float zoomFactor, ZoomMode mode, const SDL_Point& screenPos) {
     clampViewport();
 }
 
+// === Movement / Centering ===
 void Camera::move(int dx, int dy) {
     viewport.x += dx;
     viewport.y += dy;
@@ -69,6 +73,27 @@ void Camera::centerOnCanvas() {
     clampViewport();
 }
 
+// === Update ===
+void Camera::update() {
+    clampViewport();
+}
+
+// === Coordinate transforms ===
+SDL_Point Camera::worldToScreen(const SDL_Point& world) const {
+    SDL_Point scr;
+    scr.x = static_cast<int>((world.x * scale) - viewport.x);
+    scr.y = static_cast<int>((world.y * scale) - viewport.y);
+    return scr;
+}
+
+SDL_Point Camera::screenToWorld(const SDL_Point& screen) const {
+    SDL_Point world;
+    world.x = static_cast<int>((viewport.x + screen.x) / scale);
+    world.y = static_cast<int>((viewport.y + screen.y) / scale);
+    return world;
+}
+
+// === Helpers ===
 void Camera::clampViewport() {
     int scaledCanvasW = static_cast<int>(worldWidth * scale);
     int scaledCanvasH = static_cast<int>(worldHeight * scale);
@@ -98,22 +123,4 @@ void Camera::clampViewport() {
         viewport.y = std::clamp(viewport.y, -padY,
             scaledCanvasH - viewport.h + padY);
     }
-}
-
-void Camera::update() {
-    clampViewport();
-}
-
-SDL_Point Camera::worldToScreen(const SDL_Point& world) const {
-    SDL_Point scr;
-    scr.x = static_cast<int>((world.x * scale) - viewport.x);
-    scr.y = static_cast<int>((world.y * scale) - viewport.y);
-    return scr;
-}
-
-SDL_Point Camera::screenToWorld(const SDL_Point& screen) const {
-    SDL_Point world;
-    world.x = static_cast<int>((viewport.x + screen.x) / scale);
-    world.y = static_cast<int>((viewport.y + screen.y) / scale);
-    return world;
 }

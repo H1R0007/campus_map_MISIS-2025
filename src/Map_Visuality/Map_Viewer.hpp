@@ -7,69 +7,88 @@
 #include "../aliases/AliasManager.hpp"
 #include "../map/GraphManager.hpp"
 
+// === ViewMode ===
+// Either entire campus view, or a specific building floor.
 enum class ViewMode { Campus, BuildingFloor };
 
+// === MapViewer ===
+// Main visualization layer: renders campus/buildings/floors, handles input,
+// overlays (search box, dev mode info), and user pathfinding.
 class MapViewer {
 public:
     MapViewer(SDL_Renderer* renderer, const char* mapPath);
     ~MapViewer();
 
-    void handleEvent(SDL_Event& event);
-    void render();
-    void renderOverlay();  // текст поверх
+    // === Lifecycle ===
     void onWindowResized(int w, int h);
 
+    // === Rendering ===
+    void render();         // draw map + dev layers + path
+    void renderOverlay();  // UI overlays (scale, coords, search inputs, etc.)
+
+    // === Events ===
+    void handleEvent(SDL_Event& event);
+
+    // === Pathfinding ===
     void buildPathFromAliases(const std::string& startName, const std::string& endName);
     void switchToFloor(const std::string& buildingId, int floor);
 
+    // === Getters ===
+    GraphManager& getGraphManager() { return graphManager; }
+
 private:
-
+    // === Core state ===
     GraphManager graphManager;
-
-    bool debugDrawNodes = true;
-    const Node* hoveredNode = nullptr;
-
-    std::string startNodeId;
-    std::string endNodeId;
-    std::vector<std::string> currentPath;
-
-    std::string activeNodeId;
-    bool neighborMode = false;
-    std::vector<std::string> pendingNeighbors;  // временные соседи
-
-    std::string portalStartNode;
+    AliasManager aliasManager;
+    Camera camera;
 
     SDL_Texture* mapTexture = nullptr;
     SDL_Renderer* renderer;
-    Camera camera;
     SDL_Point mapSize;
     SDL_Rect mapRect;
     SDL_Point lastMousePos;
     SDL_Point debugMouseWorld{ 0,0 };
-
     TTF_Font* font = nullptr;
 
-    void loadMap(const char* path);
+    // === Path selection ===
+    std::string startNodeId;
+    std::string endNodeId;
+    std::vector<std::string> currentPath;
 
-    Uint32 lastSaveTick = 0;
+    // === Neighbor editing (dev mode) ===
+    std::string activeNodeId;
+    bool neighborMode = false;
+    std::vector<std::string> pendingNeighbors;
+    std::string portalStartNode;
 
-    AliasManager aliasManager;
-
+    // === Overlay UI ===
     std::string inputFrom;
     std::string inputTo;
-    bool editingFrom = true; // true = редактируем поле "откуда", false = "куда"
-    // === подсказки автокомплита ===
-    int selectedSuggestionIndex = -1;                  // какой вариант подсвечен (-1 = ничего)
-    std::vector<std::string> currentSuggestions;       // варианты от aliasManager
+    bool editingFrom = true; // true = redact "OTKYDA", false = redact "KYDA"
+    int selectedSuggestionIndex = -1;
+    std::vector<std::string> currentSuggestions;
+    Uint32 lastSaveTick = 0;
 
-
+    // === View control ==
     ViewMode currentView = ViewMode::Campus;
     std::string currentBuilding;
     int currentFloor = 0;
 
+    // User options
     bool userAllowStairs = true;
     bool userAllowLift = true;
     bool userAllowBridge = true;
 
+    // ===== NEW: LineMode =====
+    bool lineMode = false;
+    bool lineStartSet = false;
+    SDL_Point lineStart;
+
+    // Dev inspector
+    bool debugDrawNodes = true;
+    const Node* hoveredNode = nullptr;
     std::string inspectorNodeId;
+
+    // === Private helpers ===
+    void loadMap(const char* path);
 };

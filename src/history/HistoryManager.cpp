@@ -1,14 +1,13 @@
-// src/history/HistoryManager.cpp
-
 #include "HistoryManager.hpp"
 #include <fstream>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 
+// === Core API ===
 void HistoryManager::push(const HistoryAction& action) {
     undoStack.push_back(action);
-    redoStack.clear(); // после нового действия redo теряет смысл
+    redoStack.clear(); // new action invalidates redo stack
 }
 
 std::optional<HistoryAction> HistoryManager::undo() {
@@ -27,6 +26,7 @@ std::optional<HistoryAction> HistoryManager::redo() {
     return act;
 }
 
+// === Utility ===
 void HistoryManager::clear() {
     undoStack.clear();
     redoStack.clear();

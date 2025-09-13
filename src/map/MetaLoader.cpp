@@ -5,17 +5,19 @@
 
 using json = nlohmann::json;
 
+// === Public API ===
 std::vector<std::string> MetaLoader::loadCampusBuildings(const std::string& path) {
     std::vector<std::string> result;
     std::ifstream file(path);
     if (!file.is_open()) {
         std::cerr << "Failed to open campus meta: " << path << "\n";
-        return result;
+        return result;  // return empty list on error
     }
     json j;
     file >> j;
     if (!j.contains("buildings")) return result;
 
+    // Iterate through campus["buildings"], collect their IDs
     for (auto& b : j["buildings"]) {
         result.push_back(b.value("id", ""));
     }
@@ -27,7 +29,7 @@ BuildingMeta MetaLoader::loadBuildingMeta(const std::string& path) {
     std::ifstream file(path);
     if (!file.is_open()) {
         std::cerr << "Failed to open building meta: " << path << "\n";
-        return m;
+        return m;  // empty meta in case of error
     }
 
     json j;

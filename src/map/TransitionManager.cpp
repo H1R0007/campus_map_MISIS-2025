@@ -3,8 +3,11 @@
 #include <fstream>
 #include <iostream>
 #include <set>
+
 using json = nlohmann::json;
 
+
+// === I/O ===
 bool TransitionManager::loadFromJson(const std::string& path) {
     std::ifstream file(path);
     if (!file.is_open()) {
@@ -26,6 +29,7 @@ bool TransitionManager::loadFromJson(const std::string& path) {
         return false;
     }
 
+    // Ensure uniqueness — avoid duplicates like A<->B twice
     transitions.clear();
     std::set<std::pair<std::string, std::string>> uniq;
 
@@ -62,6 +66,24 @@ bool TransitionManager::loadFromJson(const std::string& path) {
     return true;
 }
 
+bool TransitionManager::saveToJson(const std::string& path) const {
+    json j;
+    for (auto& tr : transitions) {
+        j["transitions"].push_back({
+            {"from", { {"node", tr.fromNode} }},
+            {"to",   { {"node", tr.toNode} }},
+            {"transition_type", transitionTypeToString(tr.type)}
+            });
+    }
+
+    std::ofstream file(path);
+    if (!file.is_open()) return false;
+    file << j.dump(4);
+    return true;
+}
+
+
+// === Access ===
 std::vector<std::string> TransitionManager::getLinkedNodes(const std::string& nodeId) const {
     std::vector<std::string> results;
     for (auto& tr : transitions) {
@@ -71,6 +93,8 @@ std::vector<std::string> TransitionManager::getLinkedNodes(const std::string& no
     return results;
 }
 
+
+// === Editing ===
 void TransitionManager::addTransition(const Transition& t) {
     for (auto& existing : transitions) {
         if ((existing.fromNode == t.fromNode && existing.toNode == t.toNode) ||
@@ -92,20 +116,4 @@ void TransitionManager::removeTransition(const std::string& fromNode, const std:
             }),
         transitions.end()
     );
-}
-
-bool TransitionManager::saveToJson(const std::string& path) const {
-    json j;
-    for (auto& tr : transitions) {
-        j["transitions"].push_back({
-            {"from", { {"node", tr.fromNode} }},
-            {"to",   { {"node", tr.toNode} }},
-            {"transition_type", transitionTypeToString(tr.type)}
-            });
-    }
-
-    std::ofstream file(path);
-    if (!file.is_open()) return false;
-    file << j.dump(4);
-    return true;
 }
