@@ -3,16 +3,13 @@
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 #include "../Camera/Camera.hpp"
+#include "../map/Graph.hpp"
 #include "../path_finder/path_finder.hpp"
 #include "../aliases/AliasManager.hpp"
-#include "../map/GraphManager.hpp"
-
-enum class ViewMode { Campus, BuildingFloor };
 
 class MapViewer {
 public:
     MapViewer(SDL_Renderer* renderer, const char* mapPath);
-    GraphManager& getGraphManager() { return graphManager; }
     ~MapViewer();
 
     void handleEvent(SDL_Event& event);
@@ -21,10 +18,10 @@ public:
     void onWindowResized(int w, int h);
 
     void buildPathFromAliases(const std::string& startName, const std::string& endName);
-    void switchToFloor(const std::string& buildingId, int floor);
 
 private:
-    GraphManager graphManager;
+
+    Graph graph;
 
     bool debugDrawNodes = true;
     const Node* hoveredNode = nullptr;
@@ -35,11 +32,9 @@ private:
 
     std::string activeNodeId;
     bool neighborMode = false;
-    std::vector<std::string> pendingNeighbors;
+    std::vector<std::string> pendingNeighbors;  // временные соседи
 
-    std::string portalStartNode;
-
-    SDL_Texture* mapTexture = nullptr;
+    SDL_Texture* mapTexture;
     SDL_Renderer* renderer;
     Camera camera;
     SDL_Point mapSize;
@@ -57,21 +52,8 @@ private:
 
     std::string inputFrom;
     std::string inputTo;
-    bool editingFrom = true;
-
-    int selectedSuggestionIndex = -1;
-    std::vector<std::string> currentSuggestions;
-
-    ViewMode currentView = ViewMode::Campus;
-    std::string currentBuilding;
-    int currentFloor = 0;
-
-    bool userAllowStairs = true;
-    bool userAllowLift = true;
-    bool userAllowBridge = true;
-
-    // ===== NEW: LineMode =====
-    bool lineMode = false;         // активен ли режим линии
-    bool lineStartSet = false;     // выбрана ли уже первая точка
-    SDL_Point lineStart;           // первая точка линии
+    bool editingFrom = true; // true = редактируем поле "откуда", false = "куда"
+    // === подсказки автокомплита ===
+    int selectedSuggestionIndex = -1;                  // какой вариант подсвечен (-1 = ничего)
+    std::vector<std::string> currentSuggestions;       // варианты от aliasManager
 };
