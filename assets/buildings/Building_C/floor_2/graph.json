@@ -1,0 +1,31 @@
+{
+  "nodes": [
+    {
+      "id": "C_2_STAIR_1",
+      "x": 180,
+      "y": 200,
+      "building": "Building_C",
+      "floor": 2,
+      "isPortal": true,
+      "neighbors": [ "C_2_COR_1" ]
+    },
+    {
+      "id": "C_2_COR_1",
+      "x": 140,
+      "y": 70,
+      "building": "Building_C",
+      "floor": 2,
+      "isPortal": false,
+      "neighbors": [ "C_2_STAIR_1", "C_2_ROOM_201" ]
+    },
+    {
+      "id": "C_2_ROOM_201",
+      "x": 250,
+      "y": 90,
+      "building": "Building_C",
+      "floor": 2,
+      "isPortal": false,
+      "neighbors": [ "C_2_COR_1" ]
+    }
+  ]
+}

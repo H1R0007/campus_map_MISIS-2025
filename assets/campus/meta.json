@@ -1,0 +1,17 @@
+{
+  "campus_id": "MISIS_MAIN",
+  "buildings": [
+    {
+      "id": "Building_A",
+      "name": "Corpus_A"
+    },
+    {
+      "id": "Building_B",
+      "name": "Corpus_B"
+    },
+    {
+      "id": "Building_C",
+      "name": "Corpus_C"
+    }
+  ]
+}

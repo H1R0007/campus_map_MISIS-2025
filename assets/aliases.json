@@ -1,48 +1,83 @@
-{
+﻿{
   "aliases": [
     {
-      "id": "node_38",
-      "name": "main entrance"
+      "id": "CAMPUS_0_SQUARE",
+      "name": "Campus Central Square"
     },
     {
-      "id": "node_1",
-      "name": "lobby"
+      "id": "CAMPUS_0_GATE_A",
+      "name": "Campus to Building A"
     },
     {
-      "id": "node_2",
-      "name": "left corridor"
+      "id": "CAMPUS_0_GATE_B",
+      "name": "Campus to Building B"
     },
     {
-      "id": "node_3",
-      "name": "room 101"
+      "id": "CAMPUS_0_GATE_C",
+      "name": "Campus to Building C"
+    },
+
+    {
+      "id": "A_1_ENTRY_1",
+      "name": "Building A Main Entrance"
     },
     {
-      "id": "node_4",
-      "name": "room 102"
+      "id": "A_1_ROOM_101",
+      "name": "Building A Floor 1 Room 101"
     },
     {
-      "id": "node_5",
-      "name": "room 103"
+      "id": "A_1_STAIR_1",
+      "name": "Building A Floor 1 Stair"
     },
     {
-      "id": "node_6",
-      "name": "room 104"
+      "id": "A_2_ROOM_201",
+      "name": "Building A Floor 2 Room 201"
     },
     {
-      "id": "node_7",
-      "name": "right corridor"
+      "id": "A_2_STAIR_1",
+      "name": "Building A Floor 2 Stair"
+    },
+
+    {
+      "id": "B_1_ENTRY_1",
+      "name": "Building B Main Entrance"
     },
     {
-      "id": "node_31",
-      "name": "library exit"
+      "id": "B_1_ROOM_101",
+      "name": "Building B Floor 1 Room 101"
     },
     {
-      "id": "node_8",
-      "name": "stairs to 2nd floor"
+      "id": "B_1_STAIR_1",
+      "name": "Building B Floor 1 Stair"
     },
     {
-      "id": "node_100",
-      "name": "test point"
+      "id": "B_2_ROOM_201",
+      "name": "Building B Floor 2 Room 201"
+    },
+    {
+      "id": "B_2_STAIR_1",
+      "name": "Building B Floor 2 Stair"
+    },
+
+    {
+      "id": "C_1_ENTRY_1",
+      "name": "Building C Main Entrance"
+    },
+    {
+      "id": "C_1_ROOM_101",
+      "name": "Building C Floor 1 Room 101"
+    },
+    {
+      "id": "C_1_STAIR_1",
+      "name": "Building C Floor 1 Stair"
+    },
+    {
+      "id": "C_2_ROOM_201",
+      "name": "Building C Floor 2 Room 201"
+    },
+    {
+      "id": "C_2_STAIR_1",
+      "name": "Building C Floor 2 Stair"
     }
   ]
 }
