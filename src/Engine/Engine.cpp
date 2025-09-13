@@ -23,7 +23,7 @@ Engine::Engine(const char* title, int w, int h) : isRunning(true) {
     );
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
-    mapViewer = new MapViewer(renderer, Config::MAP_PATH);
+    mapViewer = new MapViewer(renderer, Config::CAMPUS_MAP_PATH);
 }
 
 void Engine::handleEvents() {
@@ -93,12 +93,22 @@ void Engine::handleFrame() {
 }
 
 Engine::~Engine() {
+    // Сохраняем всё перед выходом (только в DEV_MODE)
+    if (Config::DEV_MODE && mapViewer) {
+        // Сохраним активный граф (этаж/кампус)
+        mapViewer->getGraphManager().saveActive();
+
+        // Сохраним переходы (порталы/лестницы/двери)
+        mapViewer->getGraphManager().saveTransitions("assets/transitions/transitions.json");
+
+        std::cout << "[Engine] Автоматически сохранены графы и переходы перед выходом\n";
+    }
+
     delete mapViewer;
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
 
     SDL_StopTextInput();
-
     TTF_Quit();
     SDL_Quit();
 }
