@@ -108,32 +108,50 @@ void GraphManager::setActiveGraph(const std::string& key) {
 }
 
 void GraphManager::addNode(int x, int y, int floor) {
-    Node node;
-    node.id = "temp_" + std::to_string(rand()); // генератор id пока заглушка
-    node.x = x;
-    node.y = y;
-    node.floor = floor;
-    node.building = (activeKey == "__campus") ? "CAMPUS" : activeKey;
-    node.isPortal = false;
+    std::string id;
+    std::string buildingId = "CAMPUS";
+    int nodeFloor = floor;
 
     if (activeKey == "__campus") {
-        campusGraph.loadNode(node.id, node.x, node.y, node.floor, {});
+        // === CAMPUS FORMAT: CAMPUS_0_NODE_N ===
+        id = "CAMPUS_0_NODE_" + std::to_string(globalNextId++);
+        campusGraph.loadNode(id, x, y, 0, {}); // floor=0 always
     }
     else if (graphs.count(activeKey)) {
-        graphs[activeKey].loadNode(node.id, node.x, node.y, node.floor, {});
+        auto pos = activeKey.find("_floor_");
+        if (pos != std::string::npos) {
+            buildingId = activeKey.substr(0, pos);
+            try {
+                nodeFloor = std::stoi(activeKey.substr(pos + 7));
+            }
+            catch (...) { nodeFloor = floor; }
+        }
+
+        // === BUILDING FORMAT: A_1_NODE_N ===
+        std::string prefix = buildingId.substr(buildingId.find("_") + 1);
+        // prefix = "A"
+
+        id = prefix + "_" + std::to_string(nodeFloor) + "_NODE_" + std::to_string(globalNextId++);
+        graphs[activeKey].loadNode(id, x, y, nodeFloor, {});
+    }
+    if (Node* n = const_cast<Node*>(getNode(id))) {
+        n->building = buildingId;
+        n->floor = nodeFloor;
     }
 
-    nlohmann::json snap = {
-        {"id", node.id},
-        {"x", node.x},
-        {"y", node.y},
-        {"floor", node.floor},
-        {"building", node.building},
-        {"isPortal", node.isPortal},
-        {"neighbors", node.neighbors}
-    };
-
-    history.push({ ActionType::AddNode, node.id, "", snap.dump() });
+    // === History ===
+    if (!performingUndoRedo) {
+        nlohmann::json snap = {
+            {"id", id},
+            {"x", x},
+            {"y", y},
+            {"building", buildingId},
+            {"floor", nodeFloor},
+            {"isPortal", false},
+            {"neighbors", nlohmann::json::array()}
+        };
+        history.push({ ActionType::AddNode, id, "", snap.dump() });
+    }
 }
 
 void GraphManager::removeNodeById(const std::string& id) {
@@ -151,13 +169,15 @@ void GraphManager::removeNodeById(const std::string& id) {
     };
 
     if (activeKey == "__campus") {
-        campusGraph.removeNodeById(id, false);
+        campusGraph.removeNodeById(id);
     }
     else if (graphs.count(activeKey)) {
-        graphs[activeKey].removeNodeById(id, false);
+        graphs[activeKey].removeNodeById(id);
     }
 
-    history.push({ ActionType::RemoveNode, id, "", snap.dump() });
+    if (!performingUndoRedo) {
+        history.push({ ActionType::RemoveNode, id, "", snap.dump() });
+    }
 }
 
 void GraphManager::addNeighbor(const std::string& a, const std::string& b) {
@@ -168,7 +188,9 @@ void GraphManager::addNeighbor(const std::string& a, const std::string& b) {
         graphs[activeKey].addNeighbor(a, b);
     }
 
-    history.push({ ActionType::AddNeighbor, a, b, "" });
+    if (!performingUndoRedo) {
+        history.push({ ActionType::RemoveNeighbor, a, b, "" });
+    }
 }
 
 void GraphManager::removeNeighbor(const std::string& a, const std::string& b) {
@@ -179,12 +201,24 @@ void GraphManager::removeNeighbor(const std::string& a, const std::string& b) {
         graphs[activeKey].removeNeighbor(a, b);
     }
 
-    history.push({ ActionType::RemoveNeighbor, a, b, "" });
+    if (!performingUndoRedo) {
+        history.push({ ActionType::AddNeighbor, a, b, "" });
+    }
 }
 
 void GraphManager::addTransition(const Transition& t) {
     transitions.addTransition(t);
-    history.push({ ActionType::AddTransition, t.fromNode, t.toNode, transitionTypeToString(t.type) });
+
+    if (Node* n = const_cast<Node*>(getNode(t.fromNode))) {
+        n->isPortal = true;
+    }
+    if (Node* n = const_cast<Node*>(getNode(t.toNode))) {
+        n->isPortal = true;
+    }
+
+    if (!performingUndoRedo) {
+        history.push({ ActionType::AddTransition, t.fromNode, t.toNode, transitionTypeToString(t.type) });
+    }
 }
 
 void GraphManager::removeTransition(const std::string& from, const std::string& to) {
@@ -197,7 +231,25 @@ void GraphManager::removeTransition(const std::string& from, const std::string& 
     }
 
     transitions.removeTransition(from, to);
-    history.push({ ActionType::RemoveTransition, from, to, transitionTypeToString(type) });
+
+    auto stillLinked = [&](const std::string& nodeId) {
+        for (auto& tr : transitions.getTransitions()) {
+            if (tr.fromNode == nodeId || tr.toNode == nodeId)
+                return true;
+        }
+        return false;
+    };
+
+    if (Node* n = const_cast<Node*>(getNode(from))) {
+        if (!stillLinked(from)) n->isPortal = false;
+    }
+    if (Node* n = const_cast<Node*>(getNode(to))) {
+        if (!stillLinked(to)) n->isPortal = false;
+    }
+
+    if (!performingUndoRedo) {
+        history.push({ ActionType::RemoveTransition, from, to, transitionTypeToString(type) });
+    }
 }
 
 
@@ -246,13 +298,13 @@ void GraphManager::undoGlobal() {
     auto act = history.undo();
     if (!act) return;
 
+    performingUndoRedo = true;
     switch (act->type) {
     case ActionType::AddNode:
         removeNodeById(act->data1);
         break;
     case ActionType::RemoveNode:
         restoreNodeFromJson(act->extra);
-        break;
         break;
     case ActionType::AddNeighbor:
         removeNeighbor(act->data1, act->data2);
@@ -269,11 +321,14 @@ void GraphManager::undoGlobal() {
     default:
         break;
     }
+    performingUndoRedo = false;
 }
+
 void GraphManager::redoGlobal() {
     auto act = history.redo();
     if (!act) return;
 
+    performingUndoRedo = true;
     switch (act->type) {
     case ActionType::AddNode:
         restoreNodeFromJson(act->extra);
@@ -296,6 +351,7 @@ void GraphManager::redoGlobal() {
     default:
         break;
     }
+    performingUndoRedo = false;
 }
 
 // === Private Helpers ===

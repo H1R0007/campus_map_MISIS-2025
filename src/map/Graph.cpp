@@ -100,15 +100,16 @@ bool Graph::saveToJson(const std::string& path) const {
 }
 
 // === Node operations ===
-void Graph::addNode(int x, int y, int floor) {
+std::string Graph::addNode(int x, int y, int floor) {
     Node node;
     node.id = "node_" + std::to_string(nextId++);
     node.x = x;
     node.y = y;
-    node.floor = floor;  // <-- добавили этаж
+    node.floor = floor;
 
     nodes[node.id] = node;
     std::cout << "Added " << node.id << " at (" << x << "," << y << ", floor " << floor << ")\n";
+    return node.id;
 }
 
 void Graph::loadNode(const std::string& id, int x, int y, int floor, const std::vector<std::string>& neighbors) {
@@ -122,50 +123,7 @@ void Graph::loadNode(const std::string& id, int x, int y, int floor, const std::
     nodes[id] = node;
 }
 
-void Graph::removeLastNode() {
-    if (nodes.empty()) {
-        std::cout << "No nodes to remove.\n";
-        return;
-    }
-
-    int maxNum = -1;
-    std::string lastId;
-
-    for (auto& [id, node] : nodes) {
-        if (id.rfind("node_", 0) == 0) {
-            try {
-                int num = std::stoi(id.substr(5));
-                if (num > maxNum) {
-                    maxNum = num;
-                    lastId = id;
-                }
-            }
-            catch (...) {}
-        }
-    }
-
-    if (lastId.empty()) {
-        std::cout << "No auto-generated nodes to remove.\n";
-        return;  // <-- тут выходим безопасно
-    }
-
-    // Удаляем упоминания в neighbors
-    for (auto& [id, node] : nodes) {
-        node.neighbors.erase(
-            std::remove(node.neighbors.begin(), node.neighbors.end(), lastId),
-            node.neighbors.end()
-        );
-    }
-
-    nodes.erase(lastId);
-    std::cout << "Removed " << lastId << "\n";
-
-    if (!jsonPath.empty()) {
-        saveToJson(jsonPath);
-    }
-}
-
-void Graph::removeNodeById(const std::string& nodeId, bool trackHistory) {
+void Graph::removeNodeById(const std::string& nodeId) {
     auto it = nodes.find(nodeId);
     if (it == nodes.end()) return;
 

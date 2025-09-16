@@ -22,17 +22,14 @@ public:
 
     // === Node operations ===
     // Add a new auto-generated node (id = "node_X").
-    void addNode(int x, int y, int floor = 0);
+    std::string addNode(int x, int y, int floor = 0);
 
     // Load node with explicit id + neighbors
     // (used during JSON parsing and data restore).
     void loadNode(const std::string& id, int x, int y, int floor, const std::vector<std::string>& neighbors);
 
-    // Remove last auto-generated node (by highest "node_X" id).
-    void removeLastNode();
-
     // Remove node by id, optionally track history externally.
-    void removeNodeById(const std::string& nodeId, bool trackHistory = true);
+    void removeNodeById(const std::string& nodeId);
 
     // Access a node by id (nullptr if missing).
     const Node* getNode(const std::string& id) const;

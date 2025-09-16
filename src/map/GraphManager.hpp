@@ -65,4 +65,7 @@ private:
 
     // Helper to rebuild node from JSON snapshot (used in undo/redo).
     void restoreNodeFromJson(const std::string& jsonData);
+
+    bool performingUndoRedo = false;
+    int globalNextId = 1;
 };
