@@ -267,7 +267,7 @@ void MapViewer::renderOverlay() {
     // Панель поиска маршрута
     SDL_Color black = { 0,0,0,255 };
 
-    // Поле "Откуда"
+    // --- Field "OTKYDA" ---
     std::string labelFrom = "OTKYDA: " + inputFrom + (editingFrom ? "_" : "");
     SDL_Surface* surfFrom = TTF_RenderText_Blended(font, labelFrom.c_str(), black);
     SDL_Texture* texFrom = SDL_CreateTextureFromSurface(renderer, surfFrom);
@@ -276,7 +276,9 @@ void MapViewer::renderOverlay() {
     SDL_RenderCopy(renderer, texFrom, nullptr, &dstFrom);
     SDL_DestroyTexture(texFrom);
 
-    // Поле "Куда"
+    fromFieldRect = dstFrom;
+
+    // --- Field "KYDA" ---
     std::string labelTo = "KYDA: " + inputTo + (!editingFrom ? "_" : "");
     SDL_Surface* surfTo = TTF_RenderText_Blended(font, labelTo.c_str(), black);
     SDL_Texture* texTo = SDL_CreateTextureFromSurface(renderer, surfTo);
@@ -284,6 +286,8 @@ void MapViewer::renderOverlay() {
     SDL_FreeSurface(surfTo);
     SDL_RenderCopy(renderer, texTo, nullptr, &dstTo);
     SDL_DestroyTexture(texTo);
+
+    toFieldRect = dstTo;
 
     // === USER OPTIONS ===
     std::string optsText = "Options: ";
@@ -362,7 +366,6 @@ void MapViewer::renderOverlay() {
     }
 
     // === Dev Node Inspector ===
-    // === Dev Node Inspector ===
     if (Config::DEV_MODE && !inspectorNodeId.empty()) {
         const Node* n = graphManager.getNode(inspectorNodeId);
         if (n && font) {
@@ -408,99 +411,198 @@ void MapViewer::renderOverlay() {
             }
         }
         else {
-            std::cout << "Inspector: node not found or font failed: " << inspectorNodeId << "\n";
+            std::cout << "[Inspector] node removed: " << inspectorNodeId << " -> closing\n";
+            inspectorNodeId.clear();
         }
     }
 }
 
 // === Events ===
 void MapViewer::handleEvent(SDL_Event& event) {
-    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT && Config::DEV_MODE) {
+
+    // === Mouse Button Events ===
+    if (event.type == SDL_MOUSEBUTTONDOWN) {
         SDL_Point clickScreen{ event.button.x, event.button.y };
         SDL_Point clickWorld = camera.screenToWorld(clickScreen);
 
-        std::string clickedId;
-
-        const auto& nodesHere =
-            (currentView == ViewMode::Campus) ? graphManager.getCampusNodes()
-            : graphManager.getActiveNodes();
-
-        // Находим ближайший узел
-        for (auto& [id, node] : nodesHere) {
-            SDL_Point scr = camera.worldToScreen({ node.x, node.y });
-            int dx = scr.x - clickScreen.x;
-            int dy = scr.y - clickScreen.y;
-            if (dx * dx + dy * dy <= 25) {
-                clickedId = id;
-                break;
+        // --- Input focus switching (left click on fields) ---
+        if (event.button.button == SDL_BUTTON_LEFT) {
+            if (SDL_PointInRect(&clickScreen, &fromFieldRect)) {
+                inputActive = true;
+                editingFrom = true;
+                std::cout << "[UI] Focused FROM field\n";
+                return; // block further event handling
+            }
+            if (SDL_PointInRect(&clickScreen, &toFieldRect)) {
+                inputActive = true;
+                editingFrom = false;
+                std::cout << "[UI] Focused TO field\n";
+                return;
+            }
+            // click elsewhere → clear focus
+            if (inputActive) {
+                inputActive = false;
+                std::cout << "[UI] Input focus cleared\n";
             }
         }
 
-        if (!clickedId.empty()) {
-            if (startNodeId.empty()) {
-                startNodeId = clickedId;
-                std::cout << "Start selected: " << startNodeId << "\n";
-            }
-            else if (endNodeId.empty()) {
-                endNodeId = clickedId;
-                std::cout << "End selected: " << endNodeId << "\n";
-
-                // Запуск алгоритма
-                currentPath = find_shortest_path(startNodeId, endNodeId, graphManager);
-
-                if (currentPath.empty()) {
-                    std::cout << "Path not found!\n";
+        // --- LEFT CLICK ---
+        if (event.button.button == SDL_BUTTON_LEFT) {
+            if (Config::DEV_MODE && !neighborMode) {
+                std::string clickedId = findNodeUnderCursor(clickScreen);
+                if (!clickedId.empty()) {
+                    if (startNodeId.empty()) {
+                        startNodeId = clickedId;
+                        std::cout << "Start selected: " << startNodeId << "\n";
+                    }
+                    else if (endNodeId.empty()) {
+                        endNodeId = clickedId;
+                        std::cout << "End selected: " << endNodeId << "\n";
+                        currentPath = find_shortest_path(startNodeId, endNodeId, graphManager);
+                        if (currentPath.empty()) {
+                            std::cout << "Path not found!\n";
+                        }
+                        else {
+                            std::cout << "Path has: " << currentPath.size() << " steps\n";
+                        }
+                    }
+                    else {
+                        startNodeId.clear();
+                        endNodeId.clear();
+                        currentPath.clear();
+                        std::cout << "Reset path selection\n";
+                    }
                 }
-                else {
-                    std::cout << "Path has: " << currentPath.size() << " steps\n";
-                }
-            }
-            else {
-                // Сброс, если выбрали снова (третьим кликом)
-                startNodeId.clear();
-                endNodeId.clear();
-                currentPath.clear();
-                std::cout << "Sbros vibora tocheck\n";
             }
         }
-    }
 
-    if (Config::DEV_MODE && event.type == SDL_MOUSEBUTTONDOWN
-        && event.button.button == SDL_BUTTON_RIGHT) {
-        const Uint8* keys = SDL_GetKeyboardState(nullptr);
-        if (keys[SDL_SCANCODE_LCTRL]) {
-            std::string target;
-            const auto& nodesHere =
-                (currentView == ViewMode::Campus) ? graphManager.getCampusNodes()
-                : graphManager.getActiveNodes();
-            SDL_Point clickScreen{ event.button.x, event.button.y };
-            for (auto& [id, node] : nodesHere) {
-                SDL_Point scr = camera.worldToScreen({ node.x, node.y });
-                int dx = scr.x - clickScreen.x;
-                int dy = scr.y - clickScreen.y;
-                if (dx * dx + dy * dy <= 25) { target = id; break; }
-            }
-            if (!target.empty()) {
-                if (inspectorNodeId == target) {
-                    // Повторный выбор того же узла → выключаем инспектор
-                    inspectorNodeId.clear();
-                    std::cout << "[Inspector] Closed for node " << target << "\n";
-                }
-                else {
-                    // Обычный выбор узла
-                    inspectorNodeId = target;
-                    std::cout << "[Inspector] Selected node " << inspectorNodeId << "\n";
+        // --- RIGHT CLICK ---
+        if (event.button.button == SDL_BUTTON_RIGHT) {
+            const Uint8* keys = SDL_GetKeyboardState(nullptr);
+
+            // [Ctrl+RightClick] → Inspector toggle
+            if (Config::DEV_MODE && keys[SDL_SCANCODE_LCTRL]) {
+                std::string target = findNodeUnderCursor(clickScreen);
+                if (!target.empty()) {
+                    if (inspectorNodeId == target) {
+                        inspectorNodeId.clear();
+                        std::cout << "[Inspector] Closed for node " << target << "\n";
+                    }
+                    else {
+                        inspectorNodeId = target;
+                        std::cout << "[Inspector] Selected node " << inspectorNodeId << "\n";
+                    }
                 }
                 return;
             }
+
+            // [Shift+RightClick] → delete node or edge
+            if (Config::DEV_MODE && (keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT])) {
+                std::string target = findNodeUnderCursor(clickScreen);
+                if (!target.empty()) {
+                    if (neighborMode && !activeNodeId.empty() && activeNodeId != target) {
+                        auto it = std::find(pendingNeighbors.begin(), pendingNeighbors.end(), target);
+                        if (it != pendingNeighbors.end()) {
+                            pendingNeighbors.erase(it);
+                            std::cout << "Removed staged neighbor " << target
+                                << " from " << activeNodeId << "\n";
+                        }
+                        else {
+                            graphManager.removeNeighbor(activeNodeId, target);
+                            std::cout << "Removed edge between " << activeNodeId
+                                << " and " << target << "\n";
+                        }
+                    }
+                    else {
+                        std::cout << "Removing node " << target << "\n";
+                        graphManager.removeNodeById(target);
+                    }
+                }
+                return;
+            }
+
+            // [Alt+RightClick] → neighbor mode / portal completion
+            if (Config::DEV_MODE && (keys[SDL_SCANCODE_LALT] || keys[SDL_SCANCODE_RALT])) {
+                std::string target = findNodeUnderCursor(clickScreen);
+                if (!target.empty()) {
+                    if (!portalStartNode.empty() && portalStartNode != target) {
+                        Transition tr{ portalStartNode, target, TransitionType::Door };
+                        graphManager.addTransition(tr);
+                        std::cout << "Portal created: " << portalStartNode
+                            << " <-> " << target << "\n";
+                        portalStartNode.clear();
+                    }
+                    else {
+                        activeNodeId = target;
+                        neighborMode = true;
+                        pendingNeighbors.clear();
+                        std::cout << "Neighbor mode started for " << target << "\n";
+                    }
+                }
+                return;
+            }
+
+            // [P+RightClick] → portal editing
+            if (Config::DEV_MODE && keys[SDL_SCANCODE_P]) {
+                std::string target = findNodeUnderCursor(clickScreen);
+                if (!target.empty()) {
+                    if (portalStartNode.empty()) {
+                        portalStartNode = target;
+                        std::cout << "Portal start: " << portalStartNode << "\n";
+                    }
+                    else {
+                        Transition tr{ portalStartNode, target, TransitionType::Door };
+                        graphManager.addTransition(tr);
+                        std::cout << "Portal created: " << portalStartNode
+                            << " <-> " << target << "\n";
+                        portalStartNode.clear();
+                    }
+                }
+                return;
+            }
+
+            // [NeighborMode active + RightClick] → add staged neighbor
+            if (Config::DEV_MODE && neighborMode && !activeNodeId.empty()) {
+                std::string target = findNodeUnderCursor(clickScreen, 10); // bigger pick radius
+                if (!target.empty() && target != activeNodeId &&
+                    std::find(pendingNeighbors.begin(), pendingNeighbors.end(), target) == pendingNeighbors.end()) {
+                    pendingNeighbors.push_back(target);
+                    std::cout << "Staged neighbor " << target << " for " << activeNodeId << "\n";
+                }
+                return;
+            }
+
+            // [Default RightClick] → create new node
+            if (Config::DEV_MODE && !neighborMode) {
+                graphManager.addNode(clickWorld.x, clickWorld.y);
+            }
         }
     }
 
+
+    // === Mouse Motion ===
+    if (event.type == SDL_MOUSEMOTION) {
+        SDL_Point screenPos{ event.motion.x, event.motion.y };
+        debugMouseWorld = camera.screenToWorld(screenPos);
+
+        // Dragging map
+        if (event.motion.state & SDL_BUTTON_LMASK) {
+            camera.move(-event.motion.xrel, -event.motion.yrel);
+        }
+
+        // Hover highlight (DEV only)
+        if (Config::DEV_MODE) {
+            std::string target = findNodeUnderCursor(screenPos);
+            hoveredNode = target.empty() ? nullptr : graphManager.getNode(target);
+        }
+    }
+
+
+    // === Mouse Wheel ===
     if (event.type == SDL_MOUSEWHEEL) {
         SDL_GetMouseState(&lastMousePos.x, &lastMousePos.y);
         float zoomFactor = (event.wheel.y > 0) ? 1.1f : 0.9f;
 
-        // Проверяем Ctrl
         const Uint8* state = SDL_GetKeyboardState(nullptr);
         if (state[SDL_SCANCODE_LCTRL] || state[SDL_SCANCODE_RCTRL]) {
             camera.zoom(zoomFactor, ZoomMode::Mouse, lastMousePos);
@@ -510,329 +612,105 @@ void MapViewer::handleEvent(SDL_Event& event) {
         }
     }
 
-    if (event.type == SDL_MOUSEMOTION) {
-        // конвертация в мировой XY
-        SDL_Point screenPos{ event.motion.x, event.motion.y };
-        debugMouseWorld = camera.screenToWorld(screenPos);
 
-        // если зажата ЛКМ — перемещаем карту
-        if (event.motion.state & SDL_BUTTON_LMASK) {
-            camera.move(-event.motion.xrel, -event.motion.yrel);
-        }
-
-        if (Config::DEV_MODE) {
-            hoveredNode = nullptr;
-            const auto& nodesHere =
-                (currentView == ViewMode::Campus) ? graphManager.getCampusNodes()
-                : graphManager.getActiveNodes();
-
-            for (auto& [id, node] : nodesHere) {
-                SDL_Point scr = camera.worldToScreen({ node.x, node.y });
-                int dx = scr.x - event.motion.x;
-                int dy = scr.y - event.motion.y;
-                if (dx * dx + dy * dy <= 25) {
-                    hoveredNode = &node;
-                    break;
-                }
-            }
-        }
-    }
-
-    if (event.type == SDL_MOUSEBUTTONDOWN && Config::DEV_MODE) {
-        if (event.button.button == SDL_BUTTON_RIGHT) {
-            SDL_Point clickScreen{ event.button.x, event.button.y };
-            SDL_Point clickWorld = camera.screenToWorld(clickScreen);
-
-            const Uint8* keys = SDL_GetKeyboardState(nullptr);
-
-            // ====== SHIFT + ПКМ ======
-            // Удаление (узла или staged-соседа в neighborMode)
-            if (keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT]) {
-                std::string target;
-                const auto& nodesHere =
-                    (currentView == ViewMode::Campus) ? graphManager.getCampusNodes()
-                    : graphManager.getActiveNodes();
-                for (auto& [id, node] : nodesHere) {
-                    SDL_Point scr = camera.worldToScreen({ node.x, node.y });
-                    int dx = scr.x - clickScreen.x;
-                    int dy = scr.y - clickScreen.y;
-                    if (dx * dx + dy * dy <= 25) { target = id; break; }
-                }
-                if (!target.empty()) {
-                    // Если в режиме добавления соседей — сперва проверим staged list
-                    if (neighborMode && !activeNodeId.empty() && activeNodeId != target) {
-                        auto it = std::find(pendingNeighbors.begin(),
-                            pendingNeighbors.end(), target);
-                        if (it != pendingNeighbors.end()) {
-                            pendingNeighbors.erase(it);
-                            std::cout << "Removed staged neighbor "
-                                << target << " from " << activeNodeId << "\n";
-                        }
-                        else {
-                            // Если не staged, то удаляем существующее ребро
-                            graphManager.removeNeighbor(activeNodeId, target);
-                            std::cout << "Removed edge between "
-                                << activeNodeId << " and " << target << "\n";
-                        }
-                    }
-                    else {
-                        // Если не neighborMode — обычное удаление узла
-                        std::cout << "Removing node " << target << "\n";
-                        graphManager.removeNodeById(target);
-                    }
-                }
-                return;
-            }
-
-            // ====== ALT + ПКМ ======
-            // ALT+ПКМ → neighborMode или портал‑завершение
-            if (keys[SDL_SCANCODE_LALT] || keys[SDL_SCANCODE_RALT]) {
-                std::string target;
-                const auto& nodesHere =
-                    (currentView == ViewMode::Campus) ? graphManager.getCampusNodes()
-                    : graphManager.getActiveNodes();
-                for (auto& [id, node] : nodesHere) {
-                    SDL_Point scr = camera.worldToScreen({ node.x, node.y });
-                    int dx = scr.x - clickScreen.x;
-                    int dy = scr.y - clickScreen.y;
-                    if (dx * dx + dy * dy <= 25) { target = id; break; }
-                }
-                if (!target.empty()) {
-                    if (!portalStartNode.empty() && portalStartNode != target) {
-                        // Завершение портала
-                        Transition tr{ portalStartNode, target, TransitionType::Door };
-                        graphManager.addTransition(tr);
-                        std::cout << "Portal created: " << portalStartNode << " <-> " << target << "\n";
-                        portalStartNode.clear();
-                    }
-                    else {
-                        // Enter neighborMode
-                        activeNodeId = target;
-                        neighborMode = true;
-                        pendingNeighbors.clear();
-                        std::cout << "Neighbor mode started for " << target << "\n";
-                    }
-                    return;
-                }
-            }
-
-            // P + ЛКМ → редактирование порталов
-            if (keys[SDL_SCANCODE_P]) {
-                std::string target;
-                const auto& nodesHere =
-                    (currentView == ViewMode::Campus) ? graphManager.getCampusNodes()
-                    : graphManager.getActiveNodes();
-                for (auto& [id, node] : nodesHere) {
-                    SDL_Point scr = camera.worldToScreen({ node.x, node.y });
-                    int dx = scr.x - clickScreen.x;
-                    int dy = scr.y - clickScreen.y;
-                    if (dx * dx + dy * dy <= 25) { target = id; break; }
-                }
-                if (!target.empty()) {
-                    if (portalStartNode.empty()) {
-                        portalStartNode = target;
-                        std::cout << "Portal start: " << portalStartNode << "\n";
-                    }
-                    else {
-                        Transition tr{ portalStartNode, target, TransitionType::Door };
-                        graphManager.addTransition(tr);
-                        std::cout << "Portal created: " << portalStartNode << " <-> " << target << "\n";
-                        portalStartNode.clear();
-                    }
-                }
-                return;
-            }
-
-            // ====== ПКМ (в neighborMode) ======
-            // Добавление staged соседа
-            if (neighborMode && !activeNodeId.empty()) {
-                for (auto& [id, node] : graphManager.getActiveNodesMutable()) {
-                    SDL_Point scr = camera.worldToScreen({ node.x, node.y });
-                    int dx = scr.x - clickScreen.x;
-                    int dy = scr.y - clickScreen.y;
-                    if (dx * dx + dy * dy <= 25 && id != activeNodeId) {
-                        if (std::find(pendingNeighbors.begin(), pendingNeighbors.end(), id) == pendingNeighbors.end()) {
-                            pendingNeighbors.push_back(id);
-                            std::cout << "Staged neighbor "
-                                << id << " for " << activeNodeId << "\n";
-                        }
-                        return;
-                    }
-                }
-            }
-
-            // ====== Обычный ПКМ ======
-            // Создать новый узел
-            graphManager.addNode(clickWorld.x, clickWorld.y);
-        }
-    }
-
-    if (event.type == SDL_KEYDOWN) {
-        if (Config::DEV_MODE) {
-            if (event.key.keysym.sym == SDLK_RETURN || event.key.keysym.sym == SDLK_KP_ENTER) {
-                if (neighborMode && !activeNodeId.empty()) {
-                    // Подтверждаем все staged соседи
-                    for (auto& nb : pendingNeighbors) {
-                        graphManager.addNeighbor(activeNodeId, nb);
-                    }
-
-                    std::cout << "Neighbor mode ended for "
-                        << activeNodeId << ", saved "
-                        << pendingNeighbors.size() << " neighbors\n";
-                }
-
-                // В любом случае выходим из режима
-                neighborMode = false;
-                activeNodeId.clear();
-                pendingNeighbors.clear();
-            }
-
-            // TAB → переключить Campus <-> последний корпус
-            if (event.key.keysym.sym == SDLK_TAB) {
-                if (currentView == ViewMode::Campus) {
-                    // Если раньше был выбран корпус — вернуться туда
-                    if (!currentBuilding.empty())
-                        switchToFloor(currentBuilding, currentFloor);
-                }
-                else {
-                    currentView = ViewMode::Campus;
-                    graphManager.setActiveGraph("__campus");
-                    loadMap(Config::CAMPUS_MAP_PATH);
-                    std::cout << "Switched to CAMPUS\n";
-                }
-            }
-
-            // Стрелки для переключения корпусов и этажей
-            if (event.key.keysym.sym == SDLK_RIGHT) {
-                if (currentBuilding == "Building_A") switchToFloor("Building_B", 1);
-                else if (currentBuilding == "Building_B") switchToFloor("Building_C", 1);
-                else switchToFloor("Building_A", 1);
-            }
-            if (event.key.keysym.sym == SDLK_LEFT) {
-                if (currentBuilding == "Building_C") switchToFloor("Building_B", 1);
-                else if (currentBuilding == "Building_B") switchToFloor("Building_A", 1);
-                else switchToFloor("Building_C", 1);
-            }
-            if (event.key.keysym.sym == SDLK_UP) {
-                const BuildingMeta* bm = graphManager.getBuildingMeta(currentBuilding);
-                if (bm) {
-                    for (int i = 0; i < (int)bm->floors.size(); i++) {
-                        if (bm->floors[i].floor == currentFloor && i + 1 < (int)bm->floors.size()) {
-                            switchToFloor(currentBuilding, bm->floors[i + 1].floor);
-                            break;
-                        }
-                    }
-                }
-            }
-            if (event.key.keysym.sym == SDLK_DOWN) {
-                const BuildingMeta* bm = graphManager.getBuildingMeta(currentBuilding);
-                if (bm) {
-                    for (int i = 0; i < (int)bm->floors.size(); i++) {
-                        if (bm->floors[i].floor == currentFloor && i > 0) {
-                            switchToFloor(currentBuilding, bm->floors[i - 1].floor);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (event.key.keysym.sym == SDLK_ESCAPE) {
-                std::cout << "Neighbor mode cancelled for " << activeNodeId
-                    << ", discarded " << pendingNeighbors.size() << " staged neighbors\n";
-                neighborMode = false;
-                activeNodeId.clear();
-                pendingNeighbors.clear();
-            }
-
-            if ((event.key.keysym.sym == SDLK_z) && (SDL_GetModState() & KMOD_CTRL)) {
-                std::cout << "CTRL+Z Undo\n";
-                if (Config::DEV_MODE) graphManager.undoGlobal();
-            }
-            if ((event.key.keysym.sym == SDLK_y) && (SDL_GetModState() & KMOD_CTRL)) {
-                std::cout << "CTRL+Y Redo\n";
-                if (Config::DEV_MODE) graphManager.redoGlobal();
-            }
-            if ((event.key.keysym.sym == SDLK_s) && (SDL_GetModState() & KMOD_CTRL)) {
-                if (Config::DEV_MODE) {
-                    std::cout << "CTRL+S QuickSave\n";
-                    lastSaveTick = SDL_GetTicks(); // запомнить время сохранения
-                    graphManager.saveActive();
-                }
-            }
-            if ((event.key.keysym.sym == SDLK_s) && (SDL_GetModState() & KMOD_CTRL)) {
-                if (SDL_GetModState() & KMOD_SHIFT) {
-                    // СохраняемTransitions
-                    std::cout << "CTRL+SHIFT+S Save transitions\n";
-                    graphManager.saveTransitions("assets/transitions/transitions.json");
-                }
-                else {
-                    std::cout << "CTRL+S Save graph\n";
-                    graphManager.saveActive();
-                }
-            }
-        }
-    }
-
-    // --- USER/DEV: TEXT INPUT (autocomplete fields) ---
-    if (event.type == SDL_TEXTINPUT) {
-        if (editingFrom) inputFrom += event.text.text;
-        else inputTo += event.text.text;
-        selectedSuggestionIndex = -1; // === NEW === Сброс выбора при наборе
-    }
-
-    // --- USER/DEV: KEYBOARD control for input fields + suggestions ---
-    if (event.type == SDL_KEYDOWN) {
+    // === Keyboard (developer functions) ===
+    if (event.type == SDL_KEYDOWN && Config::DEV_MODE) {
         switch (event.key.keysym.sym) {
-        case SDLK_TAB:
-            editingFrom = !editingFrom;
-            selectedSuggestionIndex = -1; // сброс подсветки
-            break;
-
-        case SDLK_BACKSPACE:
-            if (editingFrom && !inputFrom.empty()) inputFrom.pop_back();
-            if (!editingFrom && !inputTo.empty()) inputTo.pop_back();
-
-            // === NEW: если поле стало пустым, чистим подсказки ===
-            if ((editingFrom && inputFrom.empty()) || (!editingFrom && inputTo.empty())) {
-                currentSuggestions.clear();
-                selectedSuggestionIndex = -1;
-            }
-            else {
-                selectedSuggestionIndex = -1; // если просто удалили часть — сброс выбора
-            }
-            break;
-
-            // === NEW navigation in suggestions ===
-        case SDLK_DOWN:
-            if (!currentSuggestions.empty()) {
-                selectedSuggestionIndex++;
-                if (selectedSuggestionIndex >= (int)currentSuggestions.size())
-                    selectedSuggestionIndex = 0;
-            }
-            break;
-
-        case SDLK_UP:
-            if (!currentSuggestions.empty()) {
-                selectedSuggestionIndex--;
-                if (selectedSuggestionIndex < 0)
-                    selectedSuggestionIndex = (int)currentSuggestions.size() - 1;
-            }
-            break;
-
         case SDLK_RETURN:
         case SDLK_KP_ENTER:
-            if (!currentSuggestions.empty() && selectedSuggestionIndex >= 0) {
-                // подставляем выбранный alias
-                if (editingFrom) inputFrom = currentSuggestions[selectedSuggestionIndex];
-                else inputTo = currentSuggestions[selectedSuggestionIndex];
-                selectedSuggestionIndex = -1;
+            if (neighborMode && !activeNodeId.empty()) {
+                for (auto& nb : pendingNeighbors) {
+                    graphManager.addNeighbor(activeNodeId, nb);
+                }
+                std::cout << "Neighbor mode ended for "
+                    << activeNodeId << ", saved "
+                    << pendingNeighbors.size() << " neighbors\n";
+                neighborMode = false;
+                activeNodeId.clear();
+                pendingNeighbors.clear();
             }
-            else if (!inputFrom.empty() && !inputTo.empty()) {
-                buildPathFromAliases(inputFrom, inputTo);
+            break;
+        case SDLK_TAB:
+            if (currentView == ViewMode::Campus) {
+                if (!currentBuilding.empty())
+                    switchToFloor(currentBuilding, currentFloor);
+            }
+            else {
+                currentView = ViewMode::Campus;
+                graphManager.setActiveGraph("__campus");
+                loadMap(Config::CAMPUS_MAP_PATH);
+                std::cout << "Switched to CAMPUS\n";
+            }
+            break;
+        case SDLK_RIGHT:
+            if (currentBuilding == "Building_A") switchToFloor("Building_B", 1);
+            else if (currentBuilding == "Building_B") switchToFloor("Building_C", 1);
+            else switchToFloor("Building_A", 1);
+            break;
+        case SDLK_LEFT:
+            if (currentBuilding == "Building_C") switchToFloor("Building_B", 1);
+            else if (currentBuilding == "Building_B") switchToFloor("Building_A", 1);
+            else switchToFloor("Building_C", 1);
+            break;
+        case SDLK_UP: {
+            const BuildingMeta* bm = graphManager.getBuildingMeta(currentBuilding);
+            if (bm) {
+                for (int i = 0; i < (int)bm->floors.size(); i++) {
+                    if (bm->floors[i].floor == currentFloor && i + 1 < (int)bm->floors.size()) {
+                        switchToFloor(currentBuilding, bm->floors[i + 1].floor);
+                        break;
+                    }
+                }
             }
             break;
         }
+        case SDLK_DOWN: {
+            const BuildingMeta* bm = graphManager.getBuildingMeta(currentBuilding);
+            if (bm) {
+                for (int i = 0; i < (int)bm->floors.size(); i++) {
+                    if (bm->floors[i].floor == currentFloor && i > 0) {
+                        switchToFloor(currentBuilding, bm->floors[i - 1].floor);
+                        break;
+                    }
+                }
+            }
+            break;
+        }
+        case SDLK_ESCAPE:
+            std::cout << "Neighbor mode cancelled for " << activeNodeId
+                << ", discarded " << pendingNeighbors.size() << " staged neighbors\n";
+            neighborMode = false;
+            activeNodeId.clear();
+            pendingNeighbors.clear();
+            break;
+        default:
+            break;
+        }
 
+        // Ctrl+Z / Ctrl+Y Undo/Redo
+        if ((event.key.keysym.sym == SDLK_z) && (SDL_GetModState() & KMOD_CTRL)) {
+            std::cout << "CTRL+Z Undo\n";
+            graphManager.undoGlobal();
+        }
+        if ((event.key.keysym.sym == SDLK_y) && (SDL_GetModState() & KMOD_CTRL)) {
+            std::cout << "CTRL+Y Redo\n";
+            graphManager.redoGlobal();
+        }
+
+        // Ctrl+S Save
+        if ((event.key.keysym.sym == SDLK_s) && (SDL_GetModState() & KMOD_CTRL)) {
+            if (SDL_GetModState() & KMOD_SHIFT) {
+                std::cout << "CTRL+SHIFT+S Save transitions\n";
+                graphManager.saveTransitions("assets/transitions/transitions.json");
+            }
+            else {
+                std::cout << "CTRL+S Save graph\n";
+                lastSaveTick = SDL_GetTicks();
+                graphManager.saveActive();
+            }
+        }
+
+        // Toggle user options
         if (event.key.keysym.sym == SDLK_8) {
             userAllowStairs = !userAllowStairs;
             std::cout << "Option: allowStairs = " << userAllowStairs << "\n";
@@ -844,6 +722,63 @@ void MapViewer::handleEvent(SDL_Event& event) {
         if (event.key.keysym.sym == SDLK_0) {
             userAllowBridge = !userAllowBridge;
             std::cout << "Option: allowBridge = " << userAllowBridge << "\n";
+        }
+    }
+
+
+    // === Text input only if field focused ===
+    if (event.type == SDL_TEXTINPUT && inputActive) {
+        if (editingFrom) inputFrom += event.text.text;
+        else inputTo += event.text.text;
+        selectedSuggestionIndex = -1;
+    }
+
+    if (event.type == SDL_KEYDOWN) {
+        switch (event.key.keysym.sym) {
+        case SDLK_TAB: // switch input field
+            if (inputActive) {
+                editingFrom = !editingFrom;
+                selectedSuggestionIndex = -1;
+            }
+            break;
+        case SDLK_BACKSPACE:
+            if (editingFrom && !inputFrom.empty()) inputFrom.pop_back();
+            if (!editingFrom && !inputTo.empty()) inputTo.pop_back();
+            if ((editingFrom && inputFrom.empty()) || (!editingFrom && inputTo.empty())) {
+                currentSuggestions.clear();
+                selectedSuggestionIndex = -1;
+            }
+            else {
+                selectedSuggestionIndex = -1;
+            }
+            break;
+        case SDLK_DOWN:
+            if (!currentSuggestions.empty()) {
+                selectedSuggestionIndex++;
+                if (selectedSuggestionIndex >= (int)currentSuggestions.size())
+                    selectedSuggestionIndex = 0;
+            }
+            break;
+        case SDLK_UP:
+            if (!currentSuggestions.empty()) {
+                selectedSuggestionIndex--;
+                if (selectedSuggestionIndex < 0)
+                    selectedSuggestionIndex = (int)currentSuggestions.size() - 1;
+            }
+            break;
+        case SDLK_RETURN:
+        case SDLK_KP_ENTER:
+            if (!currentSuggestions.empty() && selectedSuggestionIndex >= 0) {
+                if (editingFrom) inputFrom = currentSuggestions[selectedSuggestionIndex];
+                else inputTo = currentSuggestions[selectedSuggestionIndex];
+                selectedSuggestionIndex = -1;
+            }
+            else if (!inputFrom.empty() && !inputTo.empty()) {
+                buildPathFromAliases(inputFrom, inputTo);
+            }
+            break;
+        default:
+            break;
         }
     }
 }

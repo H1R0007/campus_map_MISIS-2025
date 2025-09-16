@@ -79,11 +79,6 @@ private:
     bool userAllowLift = true;
     bool userAllowBridge = true;
 
-    // ===== NEW: LineMode =====
-    bool lineMode = false;
-    bool lineStartSet = false;
-    SDL_Point lineStart;
-
     // Dev inspector
     bool debugDrawNodes = true;
     const Node* hoveredNode = nullptr;
@@ -91,4 +86,26 @@ private:
 
     // === Private helpers ===
     void loadMap(const char* path);
+
+    // Helper: find node under cursor screen coordinates. 
+    // Returns empty string if nothing found.
+    std::string findNodeUnderCursor(const SDL_Point& clickScreen, int radius = 25) const {
+        const auto& nodesHere =
+            (currentView == ViewMode::Campus) ? graphManager.getCampusNodes()
+            : graphManager.getActiveNodes();
+        for (auto& [id, node] : nodesHere) {
+            SDL_Point scr = camera.worldToScreen({ node.x, node.y });
+            int dx = scr.x - clickScreen.x;
+            int dy = scr.y - clickScreen.y;
+            if (dx * dx + dy * dy <= radius * radius) {
+                return id;
+            }
+        }
+        return "";
+    }
+
+    // === Input fields (route search) ===
+    SDL_Rect fromFieldRect{};   // hitbox of "OTKYDA" field
+    SDL_Rect toFieldRect{};     // hitbox of "KYDA" field
+    bool inputActive = false;   // true if any input field focused
 };
