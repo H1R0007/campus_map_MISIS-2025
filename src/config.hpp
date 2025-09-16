@@ -28,7 +28,6 @@ namespace Config {
     constexpr float MAX_ZOOM = 3.0f;
 
     // === Alias, nodes, fonts ===
-    constexpr const char* NODES_PATH = "assets/nodes.json";
     constexpr const char* ALIASES_PATH = "assets/aliases.json";
     constexpr const char* FONT_PATH = "assets/fonts/Roboto-Regular.ttf";
 
@@ -45,8 +44,4 @@ namespace Config {
     inline void forceUserMode() {
         DEV_MODE = false;
     }
-
-    constexpr int LINE_POINT_SPACING = 50;   // шаг по умолчанию
-    constexpr int LINE_POINT_MIN_SPACING = 5;    // минимально возможный шаг
-    constexpr int LINE_POINT_MAX_COUNT = 100;    // максимум точек за раз
 }
