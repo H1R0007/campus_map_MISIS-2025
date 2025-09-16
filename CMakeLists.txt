@@ -11,7 +11,6 @@ add_executable(campus_map
     src/Engine/Engine.cpp
     src/Camera/Camera.cpp
     src/map/Graph.cpp
-    src/json_loader/json_loader.cpp
     src/path_finder/path_finder.cpp
  "src/aliases/AliasManager.cpp" "src/map/TransitionManager.cpp" "src/map/GraphManager.cpp" "src/map/MetaLoader.cpp" "src/history/HistoryManager.cpp")
 
