@@ -27,7 +27,8 @@ void Camera::setViewportSize(int w, int h) {
 // === Scale / Zoom ===
 void Camera::setScale(float newScale) {
     scale = std::clamp(newScale, Config::MIN_ZOOM, Config::MAX_ZOOM);
-    update();
+    clampViewport();
+
 }
 
 void Camera::zoom(float zoomFactor, ZoomMode mode, const SDL_Point& screenPos) {
@@ -70,11 +71,6 @@ void Camera::centerOnCanvas() {
 
     viewport.x = std::max(0, (scaledCanvasW - viewport.w) / 2);
     viewport.y = std::max(0, (scaledCanvasH - viewport.h) / 2);
-    clampViewport();
-}
-
-// === Update ===
-void Camera::update() {
     clampViewport();
 }
 

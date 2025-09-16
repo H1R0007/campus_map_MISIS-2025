@@ -27,9 +27,6 @@ public:
     void move(int dx, int dy);
     void centerOnCanvas();
 
-    // === Update ===
-    void update();
-
     // === Coordinate transforms ===
     SDL_Point worldToScreen(const SDL_Point& world) const;
     SDL_Point screenToWorld(const SDL_Point& screen) const;
