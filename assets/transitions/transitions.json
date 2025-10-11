@@ -1,58 +1,35 @@
 {
-    "transitions": [
-        {
-            "from": {
-                "node": "CAMPUS_0_GATE_A"
-            },
-            "to": {
-                "node": "A_1_ENTRY_1"
-            },
-            "transition_type": "door"
-        },
-        {
-            "from": {
-                "node": "CAMPUS_0_GATE_B"
-            },
-            "to": {
-                "node": "B_1_ENTRY_1"
-            },
-            "transition_type": "door"
-        },
-        {
-            "from": {
-                "node": "CAMPUS_0_GATE_C"
-            },
-            "to": {
-                "node": "C_1_ENTRY_1"
-            },
-            "transition_type": "door"
-        },
-        {
-            "from": {
-                "node": "A_1_STAIR_1"
-            },
-            "to": {
-                "node": "A_2_STAIR_1"
-            },
-            "transition_type": "stairs"
-        },
-        {
-            "from": {
-                "node": "B_1_STAIR_1"
-            },
-            "to": {
-                "node": "B_2_STAIR_1"
-            },
-            "transition_type": "stairs"
-        },
-        {
-            "from": {
-                "node": "C_1_STAIR_1"
-            },
-            "to": {
-                "node": "C_2_STAIR_1"
-            },
-            "transition_type": "stairs"
-        }
-    ]
+  "transitions": [
+    {
+      "from": { "node": "CAMPUS_0_GATE_A" },
+      "to": { "node": "A_1_ENTRY_1" },
+      "transition_type": "door"
+    },
+    {
+      "from": { "node": "CAMPUS_0_GATE_B" },
+      "to": { "node": "B_1_ENTRY_1" },
+      "transition_type": "door"
+    },
+    {
+      "from": { "node": "CAMPUS_0_GATE_C" },
+      "to": { "node": "C_1_ENTRY_1" },
+      "transition_type": "door"
+    },
+
+    {
+      "from": { "node": "A_1_STAIR_1" },
+      "to": { "node": "A_2_STAIR_1" },
+      "transition_type": "stairs"
+    },
+    {
+      "from": { "node": "B_1_STAIR_1" },
+      "to": { "node": "B_2_STAIR_1" },
+      "transition_type": "stairs"
+    },
+    {
+      "from": { "node": "C_1_STAIR_1" },
+      "to": { "node": "C_2_STAIR_1" },
+      "transition_type": "stairs"
+    }
+  ]
 }

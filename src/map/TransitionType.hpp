@@ -1,6 +1,8 @@
 #pragma once
 #include <string>
 
+// === TransitionType ===
+// Represents type of portal/connection between graph nodes.
 enum class TransitionType {
     Door,
     Stairs,
@@ -9,6 +11,8 @@ enum class TransitionType {
     Unknown
 };
 
+// === Utility functions ===
+// String <-> Enum conversion
 inline TransitionType parseTransitionType(const std::string& s) {
     if (s == "door") return TransitionType::Door;
     if (s == "stairs") return TransitionType::Stairs;

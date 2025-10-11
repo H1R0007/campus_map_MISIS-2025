@@ -1,25 +1,11 @@
 ﻿#include "GraphManager.hpp"
 #include "MetaLoader.hpp"
-#include "../config.hpp"
 #include <iostream>
 #include <nlohmann/json.hpp>
-#include <cmath>
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
-
-// ========== ЗАГРУЗКА ==========
+// === Data Loading ===
 bool GraphManager::loadCampus(const std::string& path) {
     return campusGraph.loadFromJson(path);
-}
-
-bool GraphManager::loadBuildingFloor(const std::string& key, const std::string& path) {
-    Graph g;
-    if (!g.loadFromJson(path)) return false;
-    graphs[key] = std::move(g);
-    graphPaths[key] = path;
-    return true;
 }
 
 bool GraphManager::loadCampusMeta(const std::string& path) {
@@ -41,22 +27,37 @@ bool GraphManager::loadBuildingWithMeta(const std::string& buildingId, const std
     return true;
 }
 
+bool GraphManager::loadBuildingFloor(const std::string& key, const std::string& path) {
+    Graph g;
+    if (!g.loadFromJson(path)) return false;
+    graphs[key] = std::move(g);
+    graphPaths[key] = path;   // сохраняем путь для этого графа
+    return true;
+}
+
+bool GraphManager::loadTransitions(const std::string& path) {
+    if (!transitions.loadFromJson(path)) return false;
+
+    // simple sanity check
+    for (auto& tr : transitions.getTransitions()) {
+        if (!getNode(tr.fromNode) || !getNode(tr.toNode)) {
+            std::cerr << "Warning: transition " << tr.fromNode
+                << " -> " << tr.toNode
+                << " refers to missing node!\n";
+        }
+    }
+    return true;
+}
+
+// === Metadata ===
 const BuildingMeta* GraphManager::getBuildingMeta(const std::string& id) const {
     auto it = buildingMetas.find(id);
     if (it != buildingMetas.end()) return &it->second;
     return nullptr;
 }
 
-bool GraphManager::loadTransitions(const std::string& path) {
-    if (!transitions.loadFromJson(path)) return false;
-    for (auto& tr : transitions.getTransitions()) {
-        if (!getNode(tr.fromNode) || !getNode(tr.toNode)) {
-            std::cerr << "Warning: transition " << tr.fromNode << " -> " << tr.toNode << " refers to missing node!\n";
-        }
-    }
-    return true;
-}
 
+// === Navigation Helpers ===
 const Node* GraphManager::getNode(const std::string& id) const {
     if (const Node* n = campusGraph.getNode(id)) return n;
     for (auto& [k, g] : graphs) {
@@ -67,41 +68,90 @@ const Node* GraphManager::getNode(const std::string& id) const {
 
 std::vector<std::string> GraphManager::getNeighbors(const std::string& id) const {
     std::vector<std::string> res;
+
     if (const Node* n = campusGraph.getNode(id))
         res.insert(res.end(), n->neighbors.begin(), n->neighbors.end());
+
     for (auto& [k, g] : graphs) {
         if (const Node* n = g.getNode(id)) {
             res.insert(res.end(), n->neighbors.begin(), n->neighbors.end());
             break;
         }
     }
+
+    // плюс переходы
     auto extra = transitions.getLinkedNodes(id);
     res.insert(res.end(), extra.begin(), extra.end());
+
     return res;
 }
 
-// ========== РЕДАКТИРОВАНИЕ ==========
+std::optional<TransitionType> GraphManager::getTransitionType(const std::string& a, const std::string& b) const {
+    for (auto& tr : transitions.getTransitions()) {
+        if ((tr.fromNode == a && tr.toNode == b) ||
+            (tr.fromNode == b && tr.toNode == a)) {
+            return tr.type;
+        }
+    }
+    return std::nullopt;
+}
+
+
+// === Editing (active graph) ===
 void GraphManager::setActiveGraph(const std::string& key) {
-    activeKey = (key == "__campus") ? "__campus" : key;
+    if (key == "__campus") {
+        activeKey = "__campus"; // special mask for campus
+    }
+    else {
+        activeKey = key;
+    }
 }
 
 void GraphManager::addNode(int x, int y, int floor) {
-    Node node;
-    node.id = "gen_" + std::to_string(globalNodeCounter++);
-    node.x = x; node.y = y; node.floor = floor;
-    node.building = (activeKey == "__campus") ? "CAMPUS" : activeKey;
-    node.isPortal = false;
+    std::string id;
+    std::string buildingId = "CAMPUS";
+    int nodeFloor = floor;
 
-    if (activeKey == "__campus") campusGraph.loadNode(node.id, x, y, floor, {});
-    else if (graphs.count(activeKey)) graphs[activeKey].loadNode(node.id, x, y, floor, {});
+    if (activeKey == "__campus") {
+        // === CAMPUS FORMAT: CAMPUS_0_NODE_N ===
+        id = "CAMPUS_0_NODE_" + std::to_string(globalNextId++);
+        campusGraph.loadNode(id, x, y, 0, {}); // floor=0 always
+    }
+    else if (graphs.count(activeKey)) {
+        auto pos = activeKey.find("_floor_");
+        if (pos != std::string::npos) {
+            buildingId = activeKey.substr(0, pos);
+            try {
+                nodeFloor = std::stoi(activeKey.substr(pos + 7));
+            }
+            catch (...) { nodeFloor = floor; }
+        }
 
-    nlohmann::json snap = {
-        {"id", node.id},{"x",node.x},{"y",node.y},{"floor",node.floor},
-        {"building",node.building},{"isPortal",node.isPortal},{"neighbors",node.neighbors}
-    };
-    history.push({ ActionType::AddNode, node.id, "", snap.dump() });
+        // === BUILDING FORMAT: A_1_NODE_N ===
+        std::string prefix = buildingId.substr(buildingId.find("_") + 1);
+        // prefix = "A"
 
-    saveActive(); // Автосохранение
+        id = prefix + "_" + std::to_string(nodeFloor) + "_NODE_" + std::to_string(globalNextId++);
+        graphs[activeKey].loadNode(id, x, y, nodeFloor, {});
+    }
+    if (Node* n = const_cast<Node*>(getNode(id))) {
+        n->building = buildingId;
+        n->floor = nodeFloor;
+    }
+
+    // === History ===
+    if (!performingUndoRedo) {
+        nlohmann::json snap = {
+            {"id", id},
+            {"x", x},
+            {"y", y},
+            {"building", buildingId},
+            {"floor", nodeFloor},
+            {"isPortal", false},
+            {"neighbors", nlohmann::json::array()}
+        };
+        history.push({ ActionType::AddNode, id, "", snap.dump() });
+    }
 }
 
 void GraphManager::removeNodeById(const std::string& id) {
@@ -109,105 +159,125 @@ void GraphManager::removeNodeById(const std::string& id) {
     if (!victim) return;
 
     nlohmann::json snap = {
-        {"id", victim->id},{"x",victim->x},{"y",victim->y},
-        {"floor", victim->floor},{"building",victim->building},
-        {"isPortal",victim->isPortal},{"neighbors",victim->neighbors}
+        {"id", victim->id},
+        {"x", victim->x},
+        {"y", victim->y},
+        {"floor", victim->floor},
+        {"building", victim->building},
+        {"isPortal", victim->isPortal},
+        {"neighbors", victim->neighbors}
     };
 
-    if (activeKey == "__campus") campusGraph.removeNodeById(id, false);
-    else if (graphs.count(activeKey)) graphs[activeKey].removeNodeById(id, false);
+    if (activeKey == "__campus") {
+        campusGraph.removeNodeById(id);
+    }
+    else if (graphs.count(activeKey)) {
+        graphs[activeKey].removeNodeById(id);
+    }
 
-    history.push({ ActionType::RemoveNode, id, "", snap.dump() });
+    if (!performingUndoRedo) {
+        history.push({ ActionType::RemoveNode, id, "", snap.dump() });
+    }
 }
 
 void GraphManager::addNeighbor(const std::string& a, const std::string& b) {
-    if (activeKey == "__campus") campusGraph.addNeighbor(a, b);
-    else if (graphs.count(activeKey)) graphs[activeKey].addNeighbor(a, b);
-    history.push({ ActionType::AddNeighbor, a, b, "" });
+    if (activeKey == "__campus") {
+        campusGraph.addNeighbor(a, b);
+    }
+    else if (graphs.count(activeKey)) {
+        graphs[activeKey].addNeighbor(a, b);
+    }
+
+    if (!performingUndoRedo) {
+        history.push({ ActionType::RemoveNeighbor, a, b, "" });
+    }
 }
 
 void GraphManager::removeNeighbor(const std::string& a, const std::string& b) {
-    if (activeKey == "__campus") campusGraph.removeNeighbor(a, b);
-    else if (graphs.count(activeKey)) graphs[activeKey].removeNeighbor(a, b);
-    history.push({ ActionType::RemoveNeighbor, a, b, "" });
+    if (activeKey == "__campus") {
+        campusGraph.removeNeighbor(a, b);
+    }
+    else if (graphs.count(activeKey)) {
+        graphs[activeKey].removeNeighbor(a, b);
+    }
+
+    if (!performingUndoRedo) {
+        history.push({ ActionType::AddNeighbor, a, b, "" });
+    }
 }
 
 void GraphManager::addTransition(const Transition& t) {
     transitions.addTransition(t);
-    history.push({ ActionType::AddTransition, t.fromNode, t.toNode, transitionTypeToString(t.type) });
+
+    if (Node* n = const_cast<Node*>(getNode(t.fromNode))) {
+        n->isPortal = true;
+    }
+    if (Node* n = const_cast<Node*>(getNode(t.toNode))) {
+        n->isPortal = true;
+    }
+
+    if (!performingUndoRedo) {
+        history.push({ ActionType::AddTransition, t.fromNode, t.toNode, transitionTypeToString(t.type) });
+    }
 }
 
 void GraphManager::removeTransition(const std::string& from, const std::string& to) {
     TransitionType type = TransitionType::Unknown;
-    for (auto& tr : transitions.getTransitions())
-        if ((tr.fromNode == from && tr.toNode == to) || (tr.fromNode == to && tr.toNode == from))
+    for (auto& tr : transitions.getTransitions()) {
+        if ((tr.fromNode == from && tr.toNode == to) ||
+            (tr.fromNode == to && tr.toNode == from)) {
             type = tr.type;
+        }
+    }
+
     transitions.removeTransition(from, to);
-    history.push({ ActionType::RemoveTransition, from, to, transitionTypeToString(type) });
+
+    auto stillLinked = [&](const std::string& nodeId) {
+        for (auto& tr : transitions.getTransitions()) {
+            if (tr.fromNode == nodeId || tr.toNode == nodeId)
+                return true;
+        }
+        return false;
+    };
+
+    if (Node* n = const_cast<Node*>(getNode(from))) {
+        if (!stillLinked(from)) n->isPortal = false;
+    }
+    if (Node* n = const_cast<Node*>(getNode(to))) {
+        if (!stillLinked(to)) n->isPortal = false;
+    }
+
+    if (!performingUndoRedo) {
+        history.push({ ActionType::RemoveTransition, from, to, transitionTypeToString(type) });
+    }
+}
+
+
+// === Save/load ===
+void GraphManager::saveActive() {
+    if (activeKey == "__campus") {
+        campusGraph.saveToJson("assets/campus/graph.json");
+    }
+    else if (graphs.count(activeKey)) {
+        if (graphPaths.count(activeKey)) {
+            graphs[activeKey].saveToJson(graphPaths[activeKey]);
+        }
+        else {
+            graphs[activeKey].saveToJson(activeKey + "_nodes.json"); // fallback
+        }
+    }
 }
 
 void GraphManager::saveTransitions(const std::string& path) {
     transitions.saveToJson(path);
 }
 
-void GraphManager::saveActive() {
-    if (activeKey == "__campus")
-        campusGraph.saveToJson("assets/campus/graph.json");
-    else if (graphs.count(activeKey)) {
-        if (graphPaths.count(activeKey)) graphs[activeKey].saveToJson(graphPaths[activeKey]);
-        else graphs[activeKey].saveToJson(activeKey + "_nodes.json");
-    }
-}
 
-// ========== ЛИНЕЙНЫЕ УЗЛЫ ==========
-std::vector<std::string> GraphManager::addLinearNodes(int startX, int startY, float angleDeg, int count, int floor) {
-    std::vector<std::string> created;
-    if (count <= 0) return created;
-    if (count > Config::LINE_POINT_MAX_COUNT)
-        count = Config::LINE_POINT_MAX_COUNT;
-
-    float rad = angleDeg * M_PI / 180.0f;
-    float dx = Config::LINE_POINT_SPACING * std::cos(rad);
-    float dy = Config::LINE_POINT_SPACING * std::sin(rad);
-
-    for (int i = 0; i < count; i++) {
-        Node node;
-        node.id = "line_" + std::to_string(globalNodeCounter++);
-        node.x = startX + int(i * dx);
-        node.y = startY + int(i * dy);
-        node.floor = floor;
-        node.building = (activeKey == "__campus") ? "CAMPUS" : activeKey;
-        node.isPortal = false;
-
-        if (activeKey == "__campus")
-            campusGraph.loadNode(node.id, node.x, node.y, node.floor, {});
-        else if (graphs.count(activeKey))
-            graphs[activeKey].loadNode(node.id, node.x, node.y, node.floor, {});
-
-        created.push_back(node.id);
-    }
-
-    // Сохраняем все узлы в историю
-    nlohmann::json snap;
-    for (auto& id : created) {
-        const Node* n = getNode(id);
-        if (!n) continue;
-        snap["nodes"].push_back({
-            {"id", n->id},{"x",n->x},{"y",n->y},{"floor",n->floor},
-            {"building",n->building},{"isPortal",n->isPortal},{"neighbors",n->neighbors}
-            });
-    }
-    history.push({ ActionType::AddNodesLine, "", "", snap.dump() });
-
-    saveActive(); // Автосохранение
-
-    return created;
-}
-
-// ========== ДОСТУП к узлам ==========
+// === Node Accessors ===
 const std::unordered_map<std::string, Node>& GraphManager::getActiveNodes() const {
     static std::unordered_map<std::string, Node> empty;
-    if (graphs.count(activeKey)) return graphs.at(activeKey).getNodes();
+    if (graphs.count(activeKey))
+        return graphs.at(activeKey).getNodes();
     return empty;
 }
 
@@ -217,77 +287,110 @@ const std::unordered_map<std::string, Node>& GraphManager::getCampusNodes() cons
 
 std::unordered_map<std::string, Node>& GraphManager::getActiveNodesMutable() {
     static std::unordered_map<std::string, Node> dummy;
-    if (graphs.count(activeKey)) return graphs.at(activeKey).getNodesMutable();
+    if (graphs.count(activeKey))
+        return graphs.at(activeKey).getNodesMutable();
     return dummy;
 }
 
-// ========== ВОССТАНОВЛЕНИЕ ==========
-void GraphManager::restoreNodeFromJson(const std::string& jsonData) {
-    if (jsonData.empty()) return;
-    try {
-        nlohmann::json snap = nlohmann::json::parse(jsonData);
-        if (snap.contains("nodes")) {
-            for (auto& n : snap["nodes"]) {
-                Node node;
-                node.id = n.value("id", "");
-                node.x = n.value("x", 0); node.y = n.value("y", 0);
-                node.floor = n.value("floor", 0); node.building = n.value("building", "");
-                node.isPortal = n.value("isPortal", false);
-                for (auto& nb : n["neighbors"]) node.neighbors.push_back(nb.get<std::string>());
-                if (node.building == "CAMPUS")
-                    campusGraph.loadNode(node.id, node.x, node.y, node.floor, node.neighbors);
-                else {
-                    std::string key = node.building + "_floor_" + std::to_string(node.floor);
-                    if (graphs.count(key)) graphs[key].loadNode(node.id, node.x, node.y, node.floor, node.neighbors);
-                }
-            }
-        }
-    }
-    catch (std::exception& e) {
-        std::cerr << "restoreNodeFromJson error: " << e.what() << "\n";
-    }
-}
 
-// ========== UNDO/REDO ==========
+// === Undo/Redo ===
 void GraphManager::undoGlobal() {
     auto act = history.undo();
     if (!act) return;
+
+    performingUndoRedo = true;
     switch (act->type) {
-    case ActionType::AddNode: removeNodeById(act->data1); break;
-    case ActionType::RemoveNode: restoreNodeFromJson(act->extra); break;
-    case ActionType::AddNeighbor: removeNeighbor(act->data1, act->data2); break;
-    case ActionType::RemoveNeighbor: addNeighbor(act->data1, act->data2); break;
-    case ActionType::AddTransition: removeTransition(act->data1, act->data2); break;
-    case ActionType::RemoveTransition:
-        addTransition({ act->data1,act->data2,parseTransitionType(act->extra) }); break;
-    case ActionType::AddNodesLine: // удалить все созданные пачкой
-        if (!act->extra.empty()) {
-            nlohmann::json j = nlohmann::json::parse(act->extra);
-            for (auto& n : j["nodes"]) removeNodeById(n["id"]);
-        }
+    case ActionType::AddNode:
+        removeNodeById(act->data1);
         break;
-    default: break;
+    case ActionType::RemoveNode:
+        restoreNodeFromJson(act->extra);
+        break;
+    case ActionType::AddNeighbor:
+        removeNeighbor(act->data1, act->data2);
+        break;
+    case ActionType::RemoveNeighbor:
+        addNeighbor(act->data1, act->data2);
+        break;
+    case ActionType::AddTransition:
+        removeTransition(act->data1, act->data2);
+        break;
+    case ActionType::RemoveTransition:
+        addTransition({ act->data1, act->data2, parseTransitionType(act->extra) });
+        break;
+    default:
+        break;
     }
+    performingUndoRedo = false;
 }
 
 void GraphManager::redoGlobal() {
     auto act = history.redo();
     if (!act) return;
+
+    performingUndoRedo = true;
     switch (act->type) {
-    case ActionType::AddNode: restoreNodeFromJson(act->extra); break;
-    case ActionType::RemoveNode: removeNodeById(act->data1); break;
-    case ActionType::AddNeighbor: addNeighbor(act->data1, act->data2); break;
-    case ActionType::RemoveNeighbor: removeNeighbor(act->data1, act->data2); break;
+    case ActionType::AddNode:
+        restoreNodeFromJson(act->extra);
+        break;
+    case ActionType::RemoveNode:
+        removeNodeById(act->data1);
+        break;
+    case ActionType::AddNeighbor:
+        addNeighbor(act->data1, act->data2);
+        break;
+    case ActionType::RemoveNeighbor:
+        removeNeighbor(act->data1, act->data2);
+        break;
     case ActionType::AddTransition:
-        addTransition({ act->data1, act->data2, parseTransitionType(act->extra) }); break;
-    case ActionType::RemoveTransition: removeTransition(act->data1, act->data2); break;
-    case ActionType::AddNodesLine: restoreNodeFromJson(act->extra); break;
-    default: break;
+        addTransition({ act->data1, act->data2, parseTransitionType(act->extra) });
+        break;
+    case ActionType::RemoveTransition:
+        removeTransition(act->data1, act->data2);
+        break;
+    default:
+        break;
     }
+    performingUndoRedo = false;
 }
 
-std::optional<TransitionType> GraphManager::getTransitionType(const std::string& a, const std::string& b) const {
-    for (auto& tr : transitions.getTransitions())
-        if ((tr.fromNode == a && tr.toNode == b) || (tr.fromNode == b && tr.toNode == a)) return tr.type;
-    return std::nullopt;
+// === Private Helpers ===
+void GraphManager::restoreNodeFromJson(const std::string& jsonData) {
+    if (jsonData.empty()) return;
+
+    try {
+        nlohmann::json snap = nlohmann::json::parse(jsonData);
+
+        Node node;
+        node.id = snap.value("id", "");
+        node.x = snap.value("x", 0);
+        node.y = snap.value("y", 0);
+        node.floor = snap.value("floor", 0);
+        node.building = snap.value("building", "");
+        node.isPortal = snap.value("isPortal", false);
+
+        if (snap.contains("neighbors")) {
+            for (auto& nb : snap["neighbors"]) {
+                node.neighbors.push_back(nb.get<std::string>());
+            }
+        }
+
+        if (node.building == "CAMPUS") {
+            campusGraph.loadNode(node.id, node.x, node.y, node.floor, node.neighbors);
+        }
+        else {
+            std::string key = node.building + "_floor_" + std::to_string(node.floor);
+            if (graphs.count(key)) {
+                graphs[key].loadNode(node.id, node.x, node.y, node.floor, node.neighbors);
+            }
+            else {
+                std::cerr << "restoreNodeFromJson: target graph not loaded for " << key << "\n";
+            }
+        }
+
+        std::cout << "Restored node: " << node.id << "\n";
+    }
+    catch (std::exception& e) {
+        std::cerr << "restoreNodeFromJson parse error: " << e.what() << "\n";
+    }
 }

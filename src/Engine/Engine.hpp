@@ -1,17 +1,19 @@
 #pragma once
 #include <SDL2/SDL.h>
 
-class MapViewer;  // Forward declaration
+class MapViewer;  // forward-declared to reduce coupling
 
+// === Engine ===
+// Main SDL runtime controller. Owns window, renderer, event loop,
+// and delegates rendering to MapViewer.
 class Engine {
 public:
     Engine(const char* title, int width, int height);
     ~Engine();
 
-    void run();
-    void stop() { isRunning = false; }  // Реализация inline
-
-    void handleFrame();
+    void run();              // desktop loop
+    void handleFrame();      // wasm loop (called each frame)
+    void stop() { isRunning = false; }
 
 private:
     SDL_Window* window;
@@ -19,6 +21,7 @@ private:
     bool isRunning;
     MapViewer* mapViewer;
 
+    // input-processing + frame rendering
     void handleEvents();
     void render();
 };

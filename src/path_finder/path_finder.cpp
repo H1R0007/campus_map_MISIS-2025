@@ -5,24 +5,27 @@
 #include <cmath>
 #include <algorithm>
 
-// Эвристика A*: "примерная стоимость" от узла к цели
-// Учитываем этаж как Z-координату с фиксированной ценой за разницу этажей
+// === Heuristic (private) ===
+// Approximates distance between nodes for A* priority.
+// Uses Euclidean distance in (x,y), plus penalty for floor difference.
 static float heuristic(const Node& a, const Node& b) {
     float dx = float(a.x - b.x);
     float dy = float(a.y - b.y);
     int df = std::abs(a.floor - b.floor);
 
-    const float FLOOR_COST = 100.0f; // "цена" перехода между этажами
+    const float FLOOR_COST = 100.0f; // "FLOOR_COST" defines virtual z-distance per floor
     return std::sqrt(dx * dx + dy * dy + (df * FLOOR_COST) * (df * FLOOR_COST));
 }
 
+// === Edge cost (private) ===
+// Computes traversal cost between two nodes (direct graph edge).
+// Uses TransitionType if applicable — allows banning stairs, etc.
 static float edge_cost(const Node& a, const Node& b, const GraphManager& graphManager,
     const PathFinderOptions& options)
 {
-    // проверяем: это transition или обычное ребро?
+    // Check if this edge represents a transition (stairs, door, lift, bridge etc.)
     auto trType = graphManager.getTransitionType(a.id, b.id);
     if (trType) {
-        // фильтрация
         switch (*trType) {
         case TransitionType::Stairs:
             if (!options.allowStairs) return std::numeric_limits<float>::infinity();
@@ -41,7 +44,7 @@ static float edge_cost(const Node& a, const Node& b, const GraphManager& graphMa
         }
     }
 
-    // обычный сосед в том же графе
+    // Edge across floors without transition = unrealistic, mark as very costly.
     if (a.floor == b.floor) {
         float dx = float(a.x - b.x), dy = float(a.y - b.y);
         return std::sqrt(dx * dx + dy * dy);
@@ -51,22 +54,26 @@ static float edge_cost(const Node& a, const Node& b, const GraphManager& graphMa
     return 1000.0f;
 }
 
+
+// === Main A* Implementation ===
 std::vector<std::string> find_shortest_path(
     const std::string& start_id,
     const std::string& end_id,
     const GraphManager& graphManager,
     const PathFinderOptions& options
 ) {
+    // Guard: ensure start/end exist
     if (graphManager.getNode(start_id) == nullptr ||
         graphManager.getNode(end_id) == nullptr) {
         return {};
     }
 
-    std::unordered_map<std::string, float> g_score;
-    std::unordered_map<std::string, std::string> came_from;
+    std::unordered_map<std::string, float> g_score;     // cost from start
+    std::unordered_map<std::string, std::string> came_from; // predecessor chain
 
     g_score[start_id] = 0.0f;
 
+    // Priority queue ordered by f = g + h
     std::priority_queue<Point> open_set;
     open_set.push({ start_id, heuristic(*graphManager.getNode(start_id),
                                         *graphManager.getNode(end_id)) });
@@ -75,6 +82,7 @@ std::vector<std::string> find_shortest_path(
         auto current = open_set.top().id;
         open_set.pop();
 
+        // Reached goal → reconstruct path
         if (current == end_id) {
             std::vector<std::string> path;
             for (std::string at = end_id; !at.empty(); at = came_from.count(at) ? came_from[at] : "") {
@@ -112,5 +120,5 @@ std::vector<std::string> find_shortest_path(
         }
     }
 
-    return {}; // путь не найден
+    return {}; // No path found
 }

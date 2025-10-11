@@ -30,5 +30,3 @@ std::vector<std::string> find_shortest_path(
     const GraphManager& graphManager,
     const PathFinderOptions& options = {}
 );
-
-static float heuristic(const Node& a, const Node& b);

@@ -7,6 +7,7 @@
 
 using json = nlohmann::json;
 
+// === Helpers ===
 std::string AliasManager::normalize(const std::string& s) {
     std::string res = s;
     std::transform(res.begin(), res.end(), res.begin(),
@@ -14,6 +15,7 @@ std::string AliasManager::normalize(const std::string& s) {
     return res;
 }
 
+// === Initialization / Loading ===
 bool AliasManager::load(const std::string& path) {
     std::ifstream file(path);
     if (!file.is_open()) {
@@ -66,6 +68,7 @@ bool AliasManager::load(const std::string& path) {
     return true;
 }
 
+// === Core API ===
 std::string AliasManager::resolve(const std::string& alias) const {
     std::string norm = normalize(alias);
     auto it = aliasToId.find(norm);

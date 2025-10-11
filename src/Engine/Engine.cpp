@@ -4,6 +4,7 @@
 #include <SDL2/SDL_ttf.h>
 #include <iostream>
 
+// --- Lifecycle ---
 Engine::Engine(const char* title, int w, int h) : isRunning(true) {
     SDL_Init(SDL_INIT_VIDEO);
 
@@ -26,30 +27,54 @@ Engine::Engine(const char* title, int w, int h) : isRunning(true) {
     mapViewer = new MapViewer(renderer, Config::CAMPUS_MAP_PATH);
 }
 
+Engine::~Engine() {
+    delete mapViewer;
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+
+    SDL_StopTextInput();
+
+    TTF_Quit();
+    SDL_Quit();
+}
+
+// --- Run loops ---
+void Engine::run() {
+    while (isRunning) {
+        handleEvents();
+        render();
+        SDL_Delay(16);  // ~60 FPS throttle on desktop
+    }
+}
+
+void Engine::handleFrame() {
+    // Called by emscripten main loop -> single frame only
+    handleEvents();
+    render();
+}
+
+// --- Event handling ---
 void Engine::handleEvents() {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         if (event.type == SDL_QUIT) stop();
 
-        if (event.type == SDL_KEYDOWN) {
-            if (event.key.keysym.sym == SDLK_F11) {
-                Uint32 flags = SDL_GetWindowFlags(window);
-                if (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) {
-                    SDL_SetWindowFullscreen(window, 0);  // выйти из fullscreen
-                }
-                else {
-                    SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP); // войти
-                }
-            }
-            if (event.key.keysym.sym == SDLK_F2) {
-                // Ёта клавиша будет работать только если билд разработческий
-                if (Config::BUILD_DEV) {
-                    Config::toggleDevMode();
-                    std::cout << "Switched mode: " << (Config::DEV_MODE ? "DEV" : "USER") << "\n";
-                }
-            }
+        // Window fullscreen toggle
+        if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F11) {
+            Uint32 flags = SDL_GetWindowFlags(window);
+            SDL_SetWindowFullscreen(window,
+                (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP);
         }
 
+        // DEV mode toggle
+        if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F2) {
+            if (Config::BUILD_DEV) {
+                Config::toggleDevMode();
+                std::cout << "Switched mode: "
+                    << (Config::DEV_MODE ? "DEV" : "USER") << "\n";
+            }
+        }
+        // Window resize -> propagate to camera
         if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_RESIZED) {
             int newW = event.window.data1;
             int newH = event.window.data2;
@@ -65,50 +90,15 @@ void Engine::handleEvents() {
     }
 }
 
+// --- Rendering ---
 void Engine::render() {
-    // белый фон
+    // white
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_RenderClear(renderer);
 
-    mapViewer->render();      // карта
+    mapViewer->render();      // map
 
-    // рисуем overlay Ч процент масштаба
     mapViewer->renderOverlay();
 
     SDL_RenderPresent(renderer);
-}
-
-void Engine::run() {
-    while (isRunning) {
-        handleEvents();
-        render();
-        SDL_Delay(16);
-    }
-}
-
-void Engine::handleFrame() {
-    handleEvents();
-    render();
-    // без while и без SDL_Delay
-}
-
-Engine::~Engine() {
-    // —охран€ем всЄ перед выходом (только в DEV_MODE)
-    if (Config::DEV_MODE && mapViewer) {
-        // —охраним активный граф (этаж/кампус)
-        mapViewer->getGraphManager().saveActive();
-
-        // —охраним переходы (порталы/лестницы/двери)
-        mapViewer->getGraphManager().saveTransitions("assets/transitions/transitions.json");
-
-        std::cout << "[Engine] јвтоматически сохранены графы и переходы перед выходом\n";
-    }
-
-    delete mapViewer;
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-
-    SDL_StopTextInput();
-    TTF_Quit();
-    SDL_Quit();
 }
