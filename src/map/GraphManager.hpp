@@ -32,12 +32,13 @@ public:
 
     // === Editing (active graph) ===
     void setActiveGraph(const std::string& key); // "__campus" or "Building_X_floor_Y"
-    void addNode(int x, int y, int floor = 0);
+    std::string addNode(int x, int y, int floor = 0);
     void removeNodeById(const std::string& id);
     void addNeighbor(const std::string& a, const std::string& b);
     void removeNeighbor(const std::string& a, const std::string& b);
     void addTransition(const Transition& t);
     void removeTransition(const std::string& from, const std::string& to);
+    void recalculateGlobalNextId();
 
     // Save/load
     void saveActive();                                            // save current graph

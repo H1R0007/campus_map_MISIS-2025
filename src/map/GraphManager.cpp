@@ -107,39 +107,43 @@ void GraphManager::setActiveGraph(const std::string& key) {
     }
 }
 
-void GraphManager::addNode(int x, int y, int floor) {
     std::string id;
     std::string buildingId = "CAMPUS";
     int nodeFloor = floor;
 
+    // Определяем, куда добавляем (кампус или этаж)
     if (activeKey == "__campus") {
-        // === CAMPUS FORMAT: CAMPUS_0_NODE_N ===
+        // --- CAMPUS ---
         id = "CAMPUS_0_NODE_" + std::to_string(globalNextId++);
-        campusGraph.loadNode(id, x, y, 0, {}); // floor=0 always
+        campusGraph.loadNode(id, x, y, 0, {}); // campus-floor всегда 0
     }
     else if (graphs.count(activeKey)) {
+        // --- BUILDING FLOOR ---
         auto pos = activeKey.find("_floor_");
         if (pos != std::string::npos) {
-            buildingId = activeKey.substr(0, pos);
+            buildingId = activeKey.substr(0, pos);             // "Building_A"
             try {
-                nodeFloor = std::stoi(activeKey.substr(pos + 7));
+                nodeFloor = std::stoi(activeKey.substr(pos + 7)); // 1, 2, ...
             }
             catch (...) { nodeFloor = floor; }
         }
 
-        // === BUILDING FORMAT: A_1_NODE_N ===
+        // Префикс: A / B / C и т.п.
         std::string prefix = buildingId.substr(buildingId.find("_") + 1);
         // prefix = "A"
 
         id = prefix + "_" + std::to_string(nodeFloor) + "_NODE_" + std::to_string(globalNextId++);
+
         graphs[activeKey].loadNode(id, x, y, nodeFloor, {});
     }
+
+    // Устанавливаем дополнительные поля ( building / floor )
     if (Node* n = const_cast<Node*>(getNode(id))) {
         n->building = buildingId;
         n->floor = nodeFloor;
     }
 
-    // === History ===
+    // === Запись истории (если это не Undo/Redo) ===
     if (!performingUndoRedo) {
         nlohmann::json snap = {
             {"id", id},
@@ -152,6 +156,12 @@ void GraphManager::addNode(int x, int y, int floor) {
         };
         history.push({ ActionType::AddNode, id, "", snap.dump() });
     }
+
+    std::cout << "Added node: " << id
+        << " (" << x << "," << y << ", floor " << nodeFloor << ") in "
+        << buildingId << std::endl;
+
+    return id;
 }
 
 void GraphManager::removeNodeById(const std::string& id) {
@@ -393,4 +403,34 @@ void GraphManager::restoreNodeFromJson(const std::string& jsonData) {
     catch (std::exception& e) {
         std::cerr << "restoreNodeFromJson parse error: " << e.what() << "\n";
     }
+
+    
+}
+
+// Чтобы корректно создавать новые точки по линиям
+void GraphManager::recalculateGlobalNextId() {
+    int maxId = 1;
+
+    auto extractIdNum = [](const std::string& id) -> int {
+        // выдергиваем последний числовой суффикс из вида "A_1_NODE_27"
+        size_t pos = id.find_last_of('_');
+        if (pos != std::string::npos) {
+            try { return std::stoi(id.substr(pos + 1)); }
+            catch (...) { return 0; }
+        }
+        return 0;
+        };
+
+    // пройтись по всем графам, включая кампус
+    for (auto& [_, node] : campusGraph.getNodes()) {
+        maxId = std::max(maxId, extractIdNum(node.id));
+    }
+    for (auto& [key, g] : graphs) {
+        for (auto& [_, node] : g.getNodes()) {
+            maxId = std::max(maxId, extractIdNum(node.id));
+        }
+    }
+
+    globalNextId = maxId + 1;
+    std::cout << "[GraphManager] globalNextId recalculated -> " << globalNextId << "\n";
 }

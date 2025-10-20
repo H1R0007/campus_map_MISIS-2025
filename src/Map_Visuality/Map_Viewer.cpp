@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <cmath>
 
 // === Lifecycle ===
 MapViewer::MapViewer(SDL_Renderer* renderer, const char* /*mapPath*/)
@@ -12,6 +13,7 @@ MapViewer::MapViewer(SDL_Renderer* renderer, const char* /*mapPath*/)
     graphManager.loadCampus(Config::CAMPUS_GRAPH_PATH);
     graphManager.loadCampusMeta(Config::CAMPUS_META_PATH);
     graphManager.loadTransitions(Config::TRANSITIONS_PATH);
+    graphManager.recalculateGlobalNextId();
 
     // Начинаем с кампуса
     currentView = ViewMode::Campus;
@@ -123,6 +125,14 @@ void MapViewer::render() {
         for (int y = startY; y <= botRightWorld.y; y += step) {
             SDL_Point scrA = camera.worldToScreen({ topLeftWorld.x, y });
             SDL_Point scrB = camera.worldToScreen({ botRightWorld.x, y });
+            SDL_RenderDrawLine(renderer, scrA.x, scrA.y, scrB.x, scrB.y);
+        }
+
+        // === LineTool preview (developer mode) ===
+        if (lineToolActive && lineToolFirstPointSet) {
+            SDL_SetRenderDrawColor(renderer, 0, 150, 200, 255);
+            SDL_Point scrA = camera.worldToScreen(lineToolStart);
+            SDL_Point scrB = camera.worldToScreen(lineToolEnd);
             SDL_RenderDrawLine(renderer, scrA.x, scrA.y, scrB.x, scrB.y);
         }
     }
@@ -579,11 +589,66 @@ void MapViewer::handleEvent(SDL_Event& event) {
         }
     }
 
+    // === LineTool mouse click logic ===
+    if (Config::DEV_MODE && lineToolActive && event.type == SDL_MOUSEBUTTONDOWN
+        && event.button.button == SDL_BUTTON_LEFT) {
+
+        SDL_Point clickScreen{ event.button.x, event.button.y };
+        SDL_Point clickWorld = camera.screenToWorld(clickScreen);
+
+        if (!lineToolFirstPointSet) {
+            lineToolStart = clickWorld;
+            lineToolFirstPointSet = true;
+            std::cout << "[LineTool] Start point ("
+                << clickWorld.x << "," << clickWorld.y << ")\n";
+        }
+        else {
+            // === Вторая точка линии (фиксирование) ===
+            lineToolEnd = clickWorld;
+            lineToolFirstPointSet = false;
+            lineToolActive = false;
+
+            float dx = static_cast<float>(lineToolEnd.x - lineToolStart.x);
+            float dy = static_cast<float>(lineToolEnd.y - lineToolStart.y);
+
+            // вычисляем «по умолчанию» автоматический угол и длину
+            lineToolAngleDeg = std::atan2(dy, dx) * 180.0f / static_cast<float>(M_PI);
+            lineToolDistance = std::sqrt(dx * dx + dy * dy);
+
+            std::cout << "[LineTool] End point ("
+                << lineToolEnd.x << "," << lineToolEnd.y << ")\n";
+            std::cout << "[LineTool] Auto angle=" << lineToolAngleDeg
+                << "°, Distance=" << lineToolDistance << "\n";
+
+            // === Ввод параметров вручную ===
+            std::cout << "Enter node count (default " << lineToolCount << "): ";
+            int tmpCount;
+            if (std::cin >> tmpCount) lineToolCount = tmpCount;
+
+            std::cout << "Enter step between nodes (default " << lineToolStep << "): ";
+            int tmpStep;
+            if (std::cin >> tmpStep) lineToolStep = tmpStep;
+
+            std::cout << "Enter angle in degrees (default = auto-"
+                << lineToolAngleDeg << "): ";
+            float tmpAngle;
+            if (std::cin >> tmpAngle) lineToolAngleDeg = tmpAngle;
+
+            // Создание узлов после ввода всех параметров
+            createNodeLine(lineToolStart, lineToolAngleDeg, lineToolCount, lineToolStep);
+        }
+    }
 
     // === Mouse Motion ===
     if (event.type == SDL_MOUSEMOTION) {
         SDL_Point screenPos{ event.motion.x, event.motion.y };
         debugMouseWorld = camera.screenToWorld(screenPos);
+
+        if (Config::DEV_MODE && lineToolActive && lineToolFirstPointSet
+            && event.type == SDL_MOUSEMOTION) {
+            SDL_Point screen{ event.motion.x, event.motion.y };
+            lineToolEnd = camera.screenToWorld(screen);
+        }
 
         // Dragging map
         if (event.motion.state & SDL_BUTTON_LMASK) {
@@ -682,6 +747,16 @@ void MapViewer::handleEvent(SDL_Event& event) {
             neighborMode = false;
             activeNodeId.clear();
             pendingNeighbors.clear();
+            break;
+        case SDLK_l:
+            if (SDL_GetModState() & (KMOD_LCTRL | KMOD_RCTRL)) {
+                lineToolActive = !lineToolActive;
+                lineToolFirstPointSet = false;
+                lineToolReady = false;
+                std::cout << "[LineTool] "
+                    << (lineToolActive ? "Activated" : "Deactivated")
+                    << "\n";
+            }
             break;
         default:
             break;
@@ -827,6 +902,44 @@ void MapViewer::switchToFloor(const std::string& buildingId, int floor) {
         }
     }
     std::cout << "Floor " << floor << " not found in building " << buildingId << "\n";
+}
+
+// === Line of nodes creating ===
+void MapViewer::createNodeLine(const SDL_Point& startWorld,
+    float angleDeg, int count, int step)
+{
+    if (count <= 1) {
+        std::cout << "[LineTool] count must be >= 2\n";
+        return;
+    }
+
+    float rad = angleDeg * static_cast<float>(M_PI) / 180.0f;
+
+    // если длина уже известна, используем её для вычисления реального шага
+    if (lineToolDistance > 0 && lineToolCount > 1)
+        step = static_cast<int>(lineToolDistance / (lineToolCount - 1));
+
+    float dx = std::cos(rad) * step;
+    float dy = std::sin(rad) * step;
+
+    std::vector<std::string> ids;
+
+    for (int i = 0; i < count; ++i) {
+        int nx = static_cast<int>(std::round(startWorld.x + dx * i));
+        int ny = static_cast<int>(std::round(startWorld.y + dy * i));
+
+        nx = std::clamp(nx, 0, Config::CANVAS_WIDTH);
+        ny = std::clamp(ny, 0, Config::CANVAS_HEIGHT);
+
+        std::string id = graphManager.addNode(nx, ny, currentFloor);
+        ids.push_back(id);
+    }
+
+    for (size_t i = 1; i < ids.size(); ++i)
+        graphManager.addNeighbor(ids[i - 1], ids[i]);
+
+    std::cout << "[LineTool] Built " << ids.size() << " nodes at "
+        << angleDeg << "°, step=" << step << "\n";
 }
 
 // === Private helpers ===

@@ -108,4 +108,16 @@ private:
     SDL_Rect fromFieldRect{};   // hitbox of "OTKYDA" field
     SDL_Rect toFieldRect{};     // hitbox of "KYDA" field
     bool inputActive = false;   // true if any input field focused
+
+    // === Create nodes in line ===
+    void createNodeLine(const SDL_Point& startWorld, float angleDeg, int count, int step);
+    bool lineToolActive = false;
+    bool lineToolFirstPointSet = false;
+    SDL_Point lineToolStart{};
+    SDL_Point lineToolEnd{};
+    float lineToolAngleDeg = 0.0f;
+    float lineToolDistance = 0.0f;
+    int lineToolCount = 5;    // сколько узлов (по умолчанию)
+    int lineToolStep = 100;   // если count не задан, ориентируемся по step
+    bool lineToolReady = false;  // флаг готовности построить
 };
