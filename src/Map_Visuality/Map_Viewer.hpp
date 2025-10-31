@@ -36,6 +36,13 @@ public:
     // === Getters ===
     GraphManager& getGraphManager() { return graphManager; }
 
+    // === Setters ===
+    void setUserOptions(bool stairs, bool lift, bool bridge) {
+        userAllowStairs = stairs;
+        userAllowLift = lift;
+        userAllowBridge = bridge;
+    }
+
 private:
     // === Core state ===
     GraphManager graphManager;

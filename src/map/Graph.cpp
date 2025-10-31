@@ -3,6 +3,7 @@
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <algorithm>
+#include "../config.hpp"
 
 using json = nlohmann::json;
 
@@ -68,8 +69,11 @@ bool Graph::loadFromJson(const std::string& path) {
         catch (...) {}
 
         if (!node.id.empty()) {
+            node.x = std::max(0, std::min(node.x, Config::CANVAS_WIDTH));
+            node.y = std::max(0, std::min(node.y, Config::CANVAS_HEIGHT));
             nodes[node.id] = std::move(node);
         }
+        else std::cerr << "Warning: node with empty id skipped in " << path << "\n";
     }
 
     std::cout << "Loaded " << nodes.size() << " nodes from " << path << std::endl;
@@ -77,7 +81,9 @@ bool Graph::loadFromJson(const std::string& path) {
 }
 
 bool Graph::saveToJson(const std::string& path) const {
-    json j;
+    nlohmann::json j;
+    j["nodes"] = nlohmann::json::array();
+
     for (auto& [id, node] : nodes) {
         j["nodes"].push_back({
             {"id", node.id},
@@ -87,7 +93,7 @@ bool Graph::saveToJson(const std::string& path) const {
             {"building", node.building},
             {"isPortal", node.isPortal},
             {"neighbors", node.neighbors}
-        });
+            });
     }
 
     std::ofstream file(path);
@@ -95,7 +101,7 @@ bool Graph::saveToJson(const std::string& path) const {
         std::cerr << "Failed to save " << path << "\n";
         return false;
     }
-    file << j.dump(4); // красиво с отступами
+    file << j.dump(4);
     return true;
 }
 
@@ -161,7 +167,9 @@ void Graph::addNeighbor(const std::string& nodeId, const std::string& neighborId
     if (std::find(b.neighbors.begin(), b.neighbors.end(), nodeId) == b.neighbors.end())
         b.neighbors.push_back(nodeId);
 
+#ifndef __EMSCRIPTEN__
     saveToJson(jsonPath);
+#endif
 }
 
 void Graph::removeNeighbor(const std::string& nodeId, const std::string& neighborId) {
@@ -181,5 +189,7 @@ void Graph::removeNeighbor(const std::string& nodeId, const std::string& neighbo
         b.neighbors.end()
     );
 
+#ifndef __EMSCRIPTEN__
     saveToJson(jsonPath);
+#endif
 }

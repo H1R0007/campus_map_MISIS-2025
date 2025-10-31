@@ -15,6 +15,8 @@ public:
     void handleFrame();      // wasm loop (called each frame)
     void stop() { isRunning = false; }
 
+    MapViewer& getMapViewer() { return *mapViewer; }
+
 private:
     SDL_Window* window;
     SDL_Renderer* renderer;

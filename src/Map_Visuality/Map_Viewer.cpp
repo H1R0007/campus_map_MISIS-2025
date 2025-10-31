@@ -623,16 +623,20 @@ void MapViewer::handleEvent(SDL_Event& event) {
             // === Ввод параметров вручную ===
             std::cout << "Enter node count (default " << lineToolCount << "): ";
             int tmpCount;
+#ifndef __EMSCRIPTEN__
             if (std::cin >> tmpCount) lineToolCount = tmpCount;
-
+#endif
             std::cout << "Enter step between nodes (default " << lineToolStep << "): ";
             int tmpStep;
+#ifndef __EMSCRIPTEN__
             if (std::cin >> tmpStep) lineToolStep = tmpStep;
-
+#endif
             std::cout << "Enter angle in degrees (default = auto-"
                 << lineToolAngleDeg << "): ";
             float tmpAngle;
+#ifndef __EMSCRIPTEN__
             if (std::cin >> tmpAngle) lineToolAngleDeg = tmpAngle;
+#endif
 
             // Создание узлов после ввода всех параметров
             createNodeLine(lineToolStart, lineToolAngleDeg, lineToolCount, lineToolStep);
@@ -953,6 +957,7 @@ void MapViewer::loadMap(const char* path) {
     if (!surface) {
         std::cerr << "Failed to load map: " << path
             << " | SDL_image error: " << IMG_GetError() << std::endl;
+        mapTexture = nullptr;
         return;
     }
 

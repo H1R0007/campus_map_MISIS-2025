@@ -1,5 +1,6 @@
 ﻿#include "Camera.hpp"
 #include <algorithm>
+#include <cmath>
 
 // === Constructor ===
 Camera::Camera()
@@ -22,6 +23,10 @@ void Camera::setViewportSize(int w, int h) {
     viewport.w = w;
     viewport.h = h;
     clampViewport();
+
+    if (std::abs(scale - 1.0f) < 0.0001f) {
+        centerOnCanvas();
+    }
 }
 
 // === Scale / Zoom ===
@@ -32,6 +37,10 @@ void Camera::setScale(float newScale) {
 }
 
 void Camera::zoom(float zoomFactor, ZoomMode mode, const SDL_Point& screenPos) {
+
+    if (zoomFactor > 1.5f) zoomFactor = 1.5f;
+    if (zoomFactor < 0.7f) zoomFactor = 0.7f;
+
     float oldScale = scale;
     float newScale = std::clamp(oldScale * zoomFactor, Config::MIN_ZOOM, Config::MAX_ZOOM);
 
@@ -77,46 +86,40 @@ void Camera::centerOnCanvas() {
 // === Coordinate transforms ===
 SDL_Point Camera::worldToScreen(const SDL_Point& world) const {
     SDL_Point scr;
-    scr.x = static_cast<int>((world.x * scale) - viewport.x);
-    scr.y = static_cast<int>((world.y * scale) - viewport.y);
+    scr.x = static_cast<int>(std::lround(world.x * scale - viewport.x));
+    scr.y = static_cast<int>(std::lround(world.y * scale - viewport.y));
     return scr;
 }
 
 SDL_Point Camera::screenToWorld(const SDL_Point& screen) const {
     SDL_Point world;
-    world.x = static_cast<int>((viewport.x + screen.x) / scale);
-    world.y = static_cast<int>((viewport.y + screen.y) / scale);
+    world.x = static_cast<int>(std::lround((viewport.x + screen.x) / scale));
+    world.y = static_cast<int>(std::lround((viewport.y + screen.y) / scale));
     return world;
 }
 
 // === Helpers ===
 void Camera::clampViewport() {
-    int scaledCanvasW = static_cast<int>(worldWidth * scale);
-    int scaledCanvasH = static_cast<int>(worldHeight * scale);
-
-    // "коридор" вокруг карты (% от окна)
+    int scaledW = static_cast<int>(worldWidth * scale);
+    int scaledH = static_cast<int>(worldHeight * scale);
     int padX = viewport.w / 5;
     int padY = viewport.h / 5;
 
-    // Горизонталь
-    if (scaledCanvasW <= viewport.w) {
-        // Карта уже меньше окна → центрируем и даём двигать ±padX
-        viewport.x = (scaledCanvasW - viewport.w) / 2;
-        viewport.x = std::clamp(viewport.x, -padX, padX);
+    auto clampVal = [](int val, int minV, int maxV) {
+        return std::max(minV, std::min(val, maxV));
+        };
+
+    if (scaledW <= viewport.w) {
+        viewport.x = clampVal((scaledW - viewport.w) / 2, -padX, padX);
     }
     else {
-        // Карта больше окна → коридор по обеим сторонам
-        viewport.x = std::clamp(viewport.x, -padX,
-            scaledCanvasW - viewport.w + padX);
+        viewport.x = clampVal(viewport.x, -padX, scaledW - viewport.w + padX);
     }
 
-    // Вертикаль
-    if (scaledCanvasH <= viewport.h) {
-        viewport.y = (scaledCanvasH - viewport.h) / 2;
-        viewport.y = std::clamp(viewport.y, -padY, padY);
+    if (scaledH <= viewport.h) {
+        viewport.y = clampVal((scaledH - viewport.h) / 2, -padY, padY);
     }
     else {
-        viewport.y = std::clamp(viewport.y, -padY,
-            scaledCanvasH - viewport.h + padY);
+        viewport.y = clampVal(viewport.y, -padY, scaledH - viewport.h + padY);
     }
 }

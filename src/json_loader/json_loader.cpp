@@ -7,30 +7,34 @@ using json = nlohmann::json;
 // === Public API ===
 Graph JsonLoader::loadGraph(const std::string& filename) {
     Graph graph;
-
     std::ifstream file(filename);
     if (!file.is_open()) {
-        // Important: we fail explicitly, instead of silently returning empty graph
-        throw std::runtime_error("Failed to open file: " + filename);
+        std::cerr << "[JsonLoader] Cannot open " << filename << "\n";
+        return graph;
     }
 
-    // --- JSON parse ---
-    json j;
-    file >> j;  // note: will throw if JSON structure is broken
+    nlohmann::json j;
+    try {
+        file >> j;
+    }
+    catch (std::exception& e) {
+        std::cerr << "[JsonLoader] Parse error in " << filename << ": " << e.what() << "\n";
+        return graph;
+    }
 
-    // --- Nodes (JSON array -> Graph nodes) ---
-    // Each node expected to contain at least: id, x, y, floor, neighbors.
+    if (!j.contains("nodes") || !j["nodes"].is_array()) {
+        std::cerr << "[JsonLoader] Invalid nodes structure in " << filename << "\n";
+        return graph;
+    }
+
     for (auto& nodeData : j["nodes"]) {
-        std::string id = nodeData["id"];
-        int x = nodeData["x"];
-        int y = nodeData["y"];
-        int floor = nodeData.value("floor", 0); // floor is optional, defaults to 0 if missing
-
-        // neighbors: parsed as array<string>
-        std::vector<std::string> neighbors = nodeData["neighbors"].get<std::vector<std::string>>();
-
-        // push node into Graph
-        graph.loadNode(id, x, y, floor, neighbors);
+        Node node;
+        node.id = nodeData.value("id", "");
+        node.x = nodeData.value("x", 0);
+        node.y = nodeData.value("y", 0);
+        node.floor = nodeData.value("floor", 0);
+        node.neighbors = nodeData.value<std::vector<std::string>>("neighbors", {});
+        graph.loadNode(node.id, node.x, node.y, node.floor, node.neighbors);
     }
 
     return graph;

@@ -22,7 +22,18 @@ Engine::Engine(const char* title, int w, int h) : isRunning(true) {
         Config::WINDOW_HEIGHT,
         SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
     );
+    if (!window) {
+        std::cerr << "SDL_CreateWindow failed: " << SDL_GetError() << std::endl;
+        isRunning = false;
+        return;
+    }
+
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    if (!renderer) {
+        std::cerr << "SDL_CreateRenderer failed: " << SDL_GetError() << std::endl;
+        isRunning = false;
+        return;
+    }
 
     mapViewer = new MapViewer(renderer, Config::CAMPUS_MAP_PATH);
 }
@@ -34,16 +45,23 @@ Engine::~Engine() {
 
     SDL_StopTextInput();
 
-    TTF_Quit();
+    if (TTF_WasInit()) TTF_Quit();
+    SDL_QuitSubSystem(SDL_INIT_VIDEO);
     SDL_Quit();
 }
 
 // --- Run loops ---
 void Engine::run() {
+    const Uint32 frameDelay = 16;
     while (isRunning) {
+        Uint32 start = SDL_GetTicks();
+
         handleEvents();
         render();
-        SDL_Delay(16);  // ~60 FPS throttle on desktop
+
+        Uint32 frameTime = SDL_GetTicks() - start;
+        if (frameDelay > frameTime)
+            SDL_Delay(frameDelay - frameTime);
     }
 }
 
