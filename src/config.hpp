@@ -3,8 +3,8 @@
 namespace Config {
 
     // === Window parameters ===
-    inline int WINDOW_WIDTH = 800;
-    inline int WINDOW_HEIGHT = 600;
+    constexpr int INITIAL_WINDOW_WIDTH = 800;
+    constexpr int INITIAL_WINDOW_HEIGHT = 600;
     constexpr const char* WINDOW_TITLE = "Campus Map";
 
     // === Campus and maps ===

@@ -5,48 +5,51 @@
 #include <iostream>
 
 // --- Lifecycle ---
-Engine::Engine(const char* title, int w, int h) : isRunning(true) {
-    SDL_Init(SDL_INIT_VIDEO);
+Engine::Engine(const char* title, int w, int h)
+    : window(nullptr, SDL_DestroyWindow),       // »нициализируем умные указатели
+    renderer(nullptr, SDL_DestroyRenderer),
+    isRunning(true),
+    currentWidth(Config::INITIAL_WINDOW_WIDTH),
+    currentHeight(Config::INITIAL_WINDOW_HEIGHT)
+{
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+        std::cerr << "SDL_Init failed: " << SDL_GetError() << std::endl;
+        throw std::runtime_error("SDL Init failed");
+    }
 
     if (TTF_Init() == -1) {
         std::cerr << "Failed to init TTF: " << TTF_GetError() << std::endl;
+        SDL_Quit();
+        throw std::runtime_error("TTF Init failed");
     }
 
     SDL_StartTextInput();
 
-    window = SDL_CreateWindow(
+    // »спользуем .reset() дл€ присваивани€ значени€
+    window.reset(SDL_CreateWindow(
         Config::WINDOW_TITLE,
         SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED,
-        Config::WINDOW_WIDTH,
-        Config::WINDOW_HEIGHT,
+        currentWidth,
+        currentHeight,
         SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
-    );
+    ));
     if (!window) {
-        std::cerr << "SDL_CreateWindow failed: " << SDL_GetError() << std::endl;
-        isRunning = false;
-        return;
+        throw std::runtime_error("SDL_CreateWindow failed: " + std::string(SDL_GetError()));
     }
 
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    renderer.reset(SDL_CreateRenderer(window.get(), -1, SDL_RENDERER_ACCELERATED));
     if (!renderer) {
-        std::cerr << "SDL_CreateRenderer failed: " << SDL_GetError() << std::endl;
-        isRunning = false;
-        return;
+        throw std::runtime_error("SDL_CreateRenderer failed: " + std::string(SDL_GetError()));
     }
 
-    mapViewer = new MapViewer(renderer, Config::CAMPUS_MAP_PATH);
+    // `std::make_unique` - безопасный способ создани€
+    mapViewer = std::make_unique<MapViewer>(renderer.get(), Config::CAMPUS_MAP_PATH);
 }
 
 Engine::~Engine() {
-    delete mapViewer;
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-
     SDL_StopTextInput();
-
     if (TTF_WasInit()) TTF_Quit();
-    SDL_QuitSubSystem(SDL_INIT_VIDEO);
     SDL_Quit();
 }
 
@@ -79,8 +82,8 @@ void Engine::handleEvents() {
 
         // Window fullscreen toggle
         if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F11) {
-            Uint32 flags = SDL_GetWindowFlags(window);
-            SDL_SetWindowFullscreen(window,
+            Uint32 flags = SDL_GetWindowFlags(window.get());
+            SDL_SetWindowFullscreen(window.get(),
                 (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP);
         }
 
@@ -94,14 +97,11 @@ void Engine::handleEvents() {
         }
         // Window resize -> propagate to camera
         if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_RESIZED) {
-            int newW = event.window.data1;
-            int newH = event.window.data2;
-            Config::WINDOW_WIDTH = newW;
-            Config::WINDOW_HEIGHT = newH;
+            currentWidth = event.window.data1;
+            currentHeight = event.window.data2;
 
-            // —ообщаем всем заинтересованным
-            // (ћожно напр€мую обновить камеру через MapViewer)
-            mapViewer->onWindowResized(newW, newH);
+            // —ообщаем MapViewer об изменении размера
+            mapViewer->onWindowResized(currentWidth, currentHeight);
         }
 
         mapViewer->handleEvent(event);
@@ -111,12 +111,11 @@ void Engine::handleEvents() {
 // --- Rendering ---
 void Engine::render() {
     // white
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    SDL_RenderClear(renderer);
+    SDL_SetRenderDrawColor(renderer.get(), 255, 255, 255, 255);
+    SDL_RenderClear(renderer.get());                         
 
     mapViewer->render();      // map
-
     mapViewer->renderOverlay();
 
-    SDL_RenderPresent(renderer);
+    SDL_RenderPresent(renderer.get());           
 }

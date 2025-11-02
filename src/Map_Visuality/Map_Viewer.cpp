@@ -7,7 +7,7 @@
 
 // === Lifecycle ===
 MapViewer::MapViewer(SDL_Renderer* renderer, const char* /*mapPath*/)
-    : renderer(renderer), mapSize{ Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT }
+    : renderer(renderer), mapSize{ Config::INITIAL_WINDOW_WIDTH, Config::INITIAL_WINDOW_HEIGHT }
 {
     // Загружаем граф кампуса + метаданные + переходы
     graphManager.loadCampus(Config::CAMPUS_GRAPH_PATH);
@@ -368,7 +368,7 @@ void MapViewer::renderOverlay() {
             SDL_Color green = { 0, 200, 0, 255 };
             SDL_Surface* surf = TTF_RenderText_Blended(font, "Saved!", green);
             SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, surf);
-            SDL_Rect dst{ Config::WINDOW_WIDTH - surf->w - 20, 20, surf->w, surf->h };
+            SDL_Rect dst{ Config::INITIAL_WINDOW_WIDTH - surf->w - 20, 20, surf->w, surf->h };
             SDL_FreeSurface(surf);
             SDL_RenderCopy(renderer, tex, nullptr, &dst);
             SDL_DestroyTexture(tex);

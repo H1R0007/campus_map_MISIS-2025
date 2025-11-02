@@ -180,6 +180,14 @@ void GraphManager::removeNodeById(const std::string& id) {
         {"neighbors", victim->neighbors}
     };
 
+    auto transitions_to_check = transitions.getTransitions();
+    for (const auto& tr : transitions_to_check) {
+        if (tr.fromNode == id || tr.toNode == id) {
+            // This call will trigger its own history push if not in undo/redo mode
+            removeTransition(tr.fromNode, tr.toNode);
+        }
+    }
+
     if (activeKey == "__campus") {
         campusGraph.removeNodeById(id);
     }
@@ -191,6 +199,7 @@ void GraphManager::removeNodeById(const std::string& id) {
         history.push({ ActionType::RemoveNode, id, "", snap.dump() });
     }
 }
+
 
 void GraphManager::addNeighbor(const std::string& a, const std::string& b) {
     if (activeKey == "__campus") {

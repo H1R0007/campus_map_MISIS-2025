@@ -4,7 +4,7 @@
 
 // === Constructor ===
 Camera::Camera()
-    : viewport{ 0, 0, Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT },
+    : viewport{ 0, 0, Config::INITIAL_WINDOW_WIDTH, Config::INITIAL_WINDOW_HEIGHT },
     scale(1.0f),
     worldWidth(Config::CANVAS_WIDTH),   // по умолчанию canvas
     worldHeight(Config::CANVAS_HEIGHT)
