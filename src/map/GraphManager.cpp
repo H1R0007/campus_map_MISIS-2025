@@ -61,6 +61,14 @@ const BuildingMeta* GraphManager::getBuildingMeta(const std::string& id) const {
 // === Navigation Helpers ===
 const Node* GraphManager::getNode(const std::string& id) const {
     if (const Node* n = campusGraph.getNode(id)) return n;
+
+    // Ищем в активном графе, если он есть
+    if (graphs.count(activeKey)) {
+        if (const Node* n = graphs.at(activeKey).getNode(id)) {
+            return n;
+        }
+    }
+
     for (auto& [k, g] : graphs) {
         if (const Node* n = g.getNode(id)) return n;
     }
@@ -68,21 +76,15 @@ const Node* GraphManager::getNode(const std::string& id) const {
 }
 
 std::vector<std::string> GraphManager::getNeighbors(const std::string& id) const {
-    std::vector<std::string> res;
-
-    if (const Node* n = campusGraph.getNode(id))
-        res.insert(res.end(), n->neighbors.begin(), n->neighbors.end());
-
-    for (auto& [k, g] : graphs) {
-        if (const Node* n = g.getNode(id)) {
-            res.insert(res.end(), n->neighbors.begin(), n->neighbors.end());
-            break;
-        }
+    const Node* node = getNode(id);
+    if (!node) {
+        return {};
     }
 
-    // плюс переходы
-    auto extra = transitions.getLinkedNodes(id);
-    res.insert(res.end(), extra.begin(), extra.end());
+    std::vector<std::string> res = node->neighbors; 
+
+    auto transitionNeighbors = transitions.getLinkedNodes(id);
+    res.insert(res.end(), transitionNeighbors.begin(), transitionNeighbors.end());
 
     return res;
 }

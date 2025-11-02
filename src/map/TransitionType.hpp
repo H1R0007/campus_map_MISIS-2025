@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <algorithm>
 
 // === TransitionType ===
 // Represents type of portal/connection between graph nodes.
