@@ -44,7 +44,7 @@ Engine::Engine(const char* title, int w, int h)
     }
 
     // `std::make_unique` - безопасный способ создания
-    mapViewer = std::make_unique<MapViewer>(renderer.get(), Config::CAMPUS_MAP_PATH);
+    mapViewer = std::make_unique<MapViewer>(renderer.get());
 }
 
 Engine::~Engine() {
@@ -88,6 +88,8 @@ void Engine::handleEvents() {
         }
 
         // DEV mode toggle
+#ifndef __EMSCRIPTEN__
+// DEV mode toggle (F2) - only for native builds
         if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F2) {
             if (Config::BUILD_DEV) {
                 Config::toggleDevMode();
@@ -95,6 +97,7 @@ void Engine::handleEvents() {
                     << (Config::DEV_MODE ? "DEV" : "USER") << "\n";
             }
         }
+#endif
         // Window resize -> propagate to camera
         if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_RESIZED) {
             currentWidth = event.window.data1;
