@@ -1,8 +1,10 @@
 #pragma once
 #include <SDL2/SDL.h>
+#include "imgui.h"
 #include <memory>
 
 class MapViewer;  // forward-declared to reduce coupling
+class UIManager;
 
 // === Engine ===
 // Main SDL runtime controller. Owns window, renderer, event loop,
@@ -22,6 +24,7 @@ private:
     std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)> window;
     std::unique_ptr<SDL_Renderer, decltype(&SDL_DestroyRenderer)> renderer;
     std::unique_ptr<MapViewer> mapViewer;
+    std::unique_ptr<UIManager> uiManager;
 
     bool isRunning;
 
@@ -32,4 +35,8 @@ private:
     // input-processing + frame rendering
     void handleEvents();
     void render();
+
+    // --- ImGui Helper Methods ---
+    void initImGui();
+    void shutdownImGui();
 };

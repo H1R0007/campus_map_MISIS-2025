@@ -1,5 +1,7 @@
 #include "InputHandler.hpp"
 #include "../Map_Visuality/Map_Viewer.hpp"
+#include "imgui.h"
+#include "imgui_impl_sdl2.h"
 #include "../config.hpp"
 #include "../map/BuildingMeta.hpp"
 #include "../map/TransitionType.hpp"
@@ -16,86 +18,23 @@ InputHandler::InputHandler(MapViewer & viewer, Camera & camera, GraphManager & g
 }
 
 void InputHandler::handleEvent(const SDL_Event& event) {
-    // 1. First, handle UI-specific input, which might consume the event.
-    // This includes clicks on text fields and typing.
-    if (mapViewer.inputActive) {
-        if (event.type == SDL_TEXTINPUT || (event.type == SDL_KEYDOWN && (
-            event.key.keysym.sym == SDLK_BACKSPACE ||
-            event.key.keysym.sym == SDLK_TAB ||
-            event.key.keysym.sym == SDLK_UP ||
-            event.key.keysym.sym == SDLK_DOWN ||
-            event.key.keysym.sym == SDLK_RETURN ||
-            event.key.keysym.sym == SDLK_KP_ENTER
-            ))) {
-            processUIInput(event);
-            return; // UI input consumes the event, stop further processing.
-        }
-    }
+    // First, pass the event to ImGui.
+    // This is crucial for ImGui to handle clicks, typing, etc.
+    ImGui_ImplSDL2_ProcessEvent(&event);
 
-    // 2. If not consumed by UI, process general application events.
-    switch (event.type) {
-    case SDL_KEYDOWN:
-        handleKeyDown(event);
-        break;
-    case SDL_MOUSEBUTTONDOWN:
-        handleMouseButtonDown(event);
-        break;
-    case SDL_MOUSEMOTION:
-        handleMouseMotion(event);
-        break;
-    case SDL_MOUSEWHEEL:
-        handleMouseWheel(event);
-        break;
-    default:
-        break;
-    }
-}
-
-// Handles input ONLY when a UI text field is active
-void InputHandler::processUIInput(const SDL_Event& event) {
-    if (event.type == SDL_TEXTINPUT) {
-        handleTextInput(event);
+    // Check if ImGui wants to capture mouse or keyboard input.
+    // If it does, we should not process the event further in our application.
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse || io.WantCaptureKeyboard) {
         return;
     }
 
-    if (event.type == SDL_KEYDOWN) {
-        switch (event.key.keysym.sym) {
-        case SDLK_BACKSPACE:
-            if (mapViewer.editingFrom && !mapViewer.inputFrom.empty()) mapViewer.inputFrom.pop_back();
-            else if (!mapViewer.editingFrom && !mapViewer.inputTo.empty()) mapViewer.inputTo.pop_back();
-            mapViewer.selectedSuggestionIndex = -1;
-            break;
-        case SDLK_TAB:
-            mapViewer.editingFrom = !mapViewer.editingFrom;
-            mapViewer.selectedSuggestionIndex = -1;
-            break;
-        case SDLK_UP:
-            if (!mapViewer.currentSuggestions.empty()) {
-                mapViewer.selectedSuggestionIndex--;
-                if (mapViewer.selectedSuggestionIndex < 0) mapViewer.selectedSuggestionIndex = mapViewer.currentSuggestions.size() - 1;
-            }
-            break;
-        case SDLK_DOWN:
-            if (!mapViewer.currentSuggestions.empty()) {
-                mapViewer.selectedSuggestionIndex = (mapViewer.selectedSuggestionIndex + 1) % mapViewer.currentSuggestions.size();
-            }
-            break;
-        case SDLK_RETURN:
-        case SDLK_KP_ENTER:
-            if (mapViewer.selectedSuggestionIndex != -1 && mapViewer.selectedSuggestionIndex < mapViewer.currentSuggestions.size()) {
-                if (mapViewer.editingFrom) mapViewer.inputFrom = mapViewer.currentSuggestions[mapViewer.selectedSuggestionIndex];
-                else mapViewer.inputTo = mapViewer.currentSuggestions[mapViewer.selectedSuggestionIndex];
-                mapViewer.selectedSuggestionIndex = -1;
-            }
-            else {
-                mapViewer.buildPathFromAliases(mapViewer.inputFrom, mapViewer.inputTo);
-            }
-            break;
-        default:
-            // Let other keys (like arrows for map navigation) pass through if needed,
-            // but for now, we consume them to avoid side effects.
-            break;
-        }
+    // If the event was not captured by ImGui, process it for map interaction.
+    switch (event.type) {
+    case SDL_KEYDOWN:       handleKeyDown(event); break;
+    case SDL_MOUSEBUTTONDOWN: handleMouseButtonDown(event); break;
+    case SDL_MOUSEMOTION:   handleMouseMotion(event); break;
+    case SDL_MOUSEWHEEL:    handleMouseWheel(event); break;
     }
 }
 
@@ -110,12 +49,6 @@ void InputHandler::handleTextInput(const SDL_Event& event) {
 }
 
 void InputHandler::handleKeyDown(const SDL_Event& event) {
-    // --- User Options (always available) ---
-    switch (event.key.keysym.sym) {
-    case SDLK_8: mapViewer.userAllowStairs = !mapViewer.userAllowStairs; std::cout << "Option: allowStairs = " << (mapViewer.userAllowStairs ? "ON" : "OFF") << "\n"; return;
-    case SDLK_9: mapViewer.userAllowLift = !mapViewer.userAllowLift; std::cout << "Option: allowLift = " << (mapViewer.userAllowLift ? "ON" : "OFF") << "\n"; return;
-    case SDLK_0: mapViewer.userAllowBridge = !mapViewer.userAllowBridge; std::cout << "Option: allowBridge = " << (mapViewer.userAllowBridge ? "ON" : "OFF") << "\n"; return;
-    }
 
     // --- Map Navigation (always available) ---
     switch (event.key.keysym.sym) {
@@ -164,14 +97,6 @@ void InputHandler::handleKeyDown(const SDL_Event& event) {
 
 void InputHandler::handleMouseButtonDown(const SDL_Event& event) {
     SDL_Point clickScreen{ event.button.x, event.button.y };
-
-    // --- UI Focus Check (LMB only) ---
-    // This logic is now here to keep all mouse button logic together.
-    if (event.button.button == SDL_BUTTON_LEFT) {
-        if (SDL_PointInRect(&clickScreen, &mapViewer.fromFieldRect)) { mapViewer.inputActive = true; mapViewer.editingFrom = true; return; }
-        if (SDL_PointInRect(&clickScreen, &mapViewer.toFieldRect)) { mapViewer.inputActive = true; mapViewer.editingFrom = false; return; }
-        mapViewer.inputActive = false; // Click elsewhere clears focus.
-    }
 
     // --- Developer-only features ---
     // Wrapped in #ifndef to completely disable for Emscripten builds

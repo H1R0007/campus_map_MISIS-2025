@@ -1,8 +1,13 @@
 #include "Engine.hpp"
 #include "../config.hpp"
 #include "../Map_Visuality/Map_Viewer.hpp"
+#include "../UI/UIManager.hpp"
 #include <SDL2/SDL_ttf.h>
 #include <iostream>
+
+#include "imgui.h"
+#include "imgui_impl_sdl2.h"
+#include "imgui_impl_sdlrenderer2.h"
 
 // --- Lifecycle ---
 Engine::Engine(const char* title, int w, int h)
@@ -43,15 +48,49 @@ Engine::Engine(const char* title, int w, int h)
         throw std::runtime_error("SDL_CreateRenderer failed: " + std::string(SDL_GetError()));
     }
 
+    initImGui();
+
     // `std::make_unique` - безопасный способ создания
     mapViewer = std::make_unique<MapViewer>(renderer.get());
+    uiManager = std::make_unique<UIManager>();
 }
 
 Engine::~Engine() {
+    shutdownImGui();
+
     SDL_StopTextInput();
     if (TTF_WasInit()) TTF_Quit();
     SDL_Quit();
 }
+
+void Engine::initImGui() {
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Включить навигацию с клавиатуры
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // Включить Docking
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;   // Включить Viewports
+
+    ImGui::StyleColorsDark(); // или StyleColorsLight(), StyleColorsClassic()
+
+    // Настройка Viewports
+    ImGuiStyle& style = ImGui::GetStyle();
+    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+        style.WindowRounding = 0.0f;
+        style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+    }
+
+    // Инициализация бэкендов
+    ImGui_ImplSDL2_InitForSDLRenderer(window.get(), renderer.get());
+    ImGui_ImplSDLRenderer2_Init(renderer.get());
+}
+
+void Engine::shutdownImGui() {
+    ImGui_ImplSDLRenderer2_Shutdown();
+    ImGui_ImplSDL2_Shutdown();
+    ImGui::DestroyContext();
+}
+
 
 // --- Run loops ---
 void Engine::run() {
@@ -78,6 +117,8 @@ void Engine::handleFrame() {
 void Engine::handleEvents() {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
+        ImGui_ImplSDL2_ProcessEvent(&event);
+
         if (event.type == SDL_QUIT) stop();
 
         // Window fullscreen toggle
@@ -106,19 +147,46 @@ void Engine::handleEvents() {
             // Сообщаем MapViewer об изменении размера
             mapViewer->onWindowResized(currentWidth, currentHeight);
         }
-
-        mapViewer->handleEvent(event);
+        ImGuiIO& io = ImGui::GetIO();
+        if (io.WantCaptureMouse || io.WantCaptureKeyboard) {
+            // Если ImGui хочет мышь или клавиатуру, не передаем событие в MapViewer
+        }
+        else {
+            mapViewer->handleEvent(event);
+        }
     }
 }
 
 // --- Rendering ---
 void Engine::render() {
-    // white
+    
+    ImGui_ImplSDLRenderer2_NewFrame();
+    ImGui_ImplSDL2_NewFrame();
+    ImGui::NewFrame();
+
+    ImGui::ShowDemoWindow();
+
+    if (uiManager) {
+        mapViewer->updateSuggestions();
+        uiManager->render(*mapViewer);
+    }
+
     SDL_SetRenderDrawColor(renderer.get(), 255, 255, 255, 255);
     SDL_RenderClear(renderer.get());                         
 
     mapViewer->render();      // map
-    mapViewer->renderOverlay();
+
+    ImGui::Render();
+    ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer.get());
+
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+        SDL_Window* backup_current_window = SDL_GL_GetCurrentWindow();
+        SDL_GLContext backup_current_context = SDL_GL_GetCurrentContext();
+        ImGui::UpdatePlatformWindows();
+        ImGui::RenderPlatformWindowsDefault();
+        SDL_GL_MakeCurrent(backup_current_window, backup_current_context);
+    }
 
     SDL_RenderPresent(renderer.get());           
 }

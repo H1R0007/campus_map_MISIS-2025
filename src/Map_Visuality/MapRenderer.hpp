@@ -39,25 +39,6 @@ public:
         const SDL_Point& lineToolEnd
     );
 
-    // Отрисовка всего пользовательского интерфейса поверх сцены
-    void renderUI(
-        const Camera& camera,
-        const GraphManager& graphManager,
-        const SDL_Point& debugMouseWorld,
-        const std::string& inputFrom,
-        const std::string& inputTo,
-        bool editingFrom,
-        const std::vector<std::string>& suggestions,
-        int selectedSuggestion,
-        bool userAllowStairs,
-        bool userAllowLift,
-        bool userAllowBridge,
-        const std::string& neighborModeActiveId,
-        const std::string& inspectorNodeId,
-        Uint32 lastSaveTick,
-        bool devMode
-    );
-
     // Хелпер для получения размеров отрисованного текста (нужен для InputHandler)
     SDL_Rect getTextSize(const std::string& text);
 

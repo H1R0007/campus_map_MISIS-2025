@@ -38,7 +38,6 @@ private:
     void handleTextInput(const SDL_Event& event);
 
     // Private methods for specific input contexts
-    void processUIInput(const SDL_Event& event);
     void processDevMouseInput(const SDL_Event& event);
     void processDevKeyInput(const SDL_Event& event);
 };

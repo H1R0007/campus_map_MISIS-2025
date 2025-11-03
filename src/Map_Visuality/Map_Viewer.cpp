@@ -62,42 +62,6 @@ void MapViewer::render() {
     );
 }
 
-void MapViewer::renderOverlay() {
-    // Перед отрисовкой UI обновляем состояние, которое от него зависит
-
-    // 1. Обновляем области клика для полей ввода
-    fromFieldRect = mapRenderer->getTextSize("OTKYDA: " + inputFrom + "_");
-    fromFieldRect.x = 10; fromFieldRect.y = 60;
-    toFieldRect = mapRenderer->getTextSize("KYDA: " + inputTo + "_");
-    toFieldRect.x = 10; toFieldRect.y = 90;
-
-    // 2. Обновляем список подсказок на основе текущего ввода
-    std::string currentInput = editingFrom ? inputFrom : inputTo;
-    currentSuggestions.clear();
-    if (!currentInput.empty()) {
-        currentSuggestions = aliasManager.suggest(currentInput, 3);
-    }
-
-    // 3. Делегируем отрисовку UI рендереру, передавая ему всё актуальное состояние
-    mapRenderer->renderUI(
-        camera,
-        graphManager,
-        debugMouseWorld,
-        inputFrom,
-        inputTo,
-        editingFrom,
-        currentSuggestions,
-        selectedSuggestionIndex,
-        userAllowStairs,
-        userAllowLift,
-        userAllowBridge,
-        neighborMode ? activeNodeId : "", // Передаем ID только если режим активен
-        inspectorNodeId,
-        lastSaveTick,
-        Config::DEV_MODE
-    );
-}
-
 // === Actions (called from InputHandler) ===
 void MapViewer::buildPathFromAliases(const std::string& startName, const std::string& endName) {
 
@@ -203,4 +167,14 @@ void MapViewer::createNodeLine(const SDL_Point& startWorld, float angleDeg, int 
     }
 
     std::cout << "[LineTool] Built a line of " << newIds.size() << " nodes.\n";
+}
+
+void MapViewer::updateSuggestions() {
+    // Determine the currently active input string
+    std::string& currentInput = editingFrom ? inputFrom : inputTo;
+
+    currentSuggestions.clear();
+    if (!currentInput.empty()) {
+        currentSuggestions = aliasManager.suggest(currentInput, 3);
+    }
 }

@@ -12,7 +12,7 @@ add_executable(campus_map
     src/Camera/Camera.cpp
     src/map/Graph.cpp
     src/path_finder/path_finder.cpp
- "src/aliases/AliasManager.cpp" "src/map/TransitionManager.cpp" "src/map/GraphManager.cpp" "src/map/MetaLoader.cpp" "src/history/HistoryManager.cpp" "src/Map_Visuality/MapRenderer.cpp" "src/Input/InputHandler.cpp")
+ "src/aliases/AliasManager.cpp" "src/map/TransitionManager.cpp" "src/map/GraphManager.cpp" "src/map/MetaLoader.cpp" "src/history/HistoryManager.cpp" "src/Map_Visuality/MapRenderer.cpp" "src/Input/InputHandler.cpp" "src/UI/UIManager.cpp")
 
 option(USE_SDL_IMAGE "Use SDL2_image (PNG, JPG, etc.)" ON)
 option(USE_SDL_TTF   "Use SDL2_ttf (fonts)"            ON)
@@ -76,4 +76,40 @@ else()
   # nlohmann_json через vcpkg
   find_package(nlohmann_json CONFIG REQUIRED)
   target_link_libraries(campus_map PRIVATE nlohmann_json::nlohmann_json)
+endif()
+
+# ===================================================================
+# Dear ImGui Integration
+# ===================================================================
+include(FetchContent)
+
+# 1. Fetch Dear ImGui
+FetchContent_Declare(
+  imgui
+  GIT_REPOSITORY https://github.com/ocornut/imgui.git
+  GIT_TAG        v1.92.4-docking
+)
+FetchContent_MakeAvailable(imgui)
+
+# 2. Add ImGui sources to our executable
+# ImGui компилируется как часть нашего проекта, а не как отдельная библиотека.
+target_sources(campus_map PRIVATE
+  ${imgui_SOURCE_DIR}/imgui.cpp
+  ${imgui_SOURCE_DIR}/imgui_draw.cpp
+  ${imgui_SOURCE_DIR}/imgui_tables.cpp
+  ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+  ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl2.cpp
+  ${imgui_SOURCE_DIR}/imgui_demo.cpp
+  ${imgui_SOURCE_DIR}/backends/imgui_impl_sdlrenderer2.cpp # Бэкенд для SDL_Renderer
+)
+
+# 3. Include ImGui directories
+target_include_directories(campus_map PRIVATE
+    ${imgui_SOURCE_DIR}
+    ${imgui_SOURCE_DIR}/backends
+)
+
+# 4. Link OpenGL library for Emscripten (ImGui renderer needs it)
+if(EMSCRIPTEN)
+  target_link_libraries(campus_map PRIVATE "-sUSE_WEBGL2=1")
 endif()

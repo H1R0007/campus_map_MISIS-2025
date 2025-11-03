@@ -31,7 +31,6 @@ public:
 
     // === Отрисовка ===
     void render();        // Отрисовка основной сцены (карта, узлы, пути)
-    void renderOverlay(); // Отрисовка UI поверх сцены (поля ввода, подсказки и т.д.)
 
     // === Методы-действия (вызываются из InputHandler) ===
     void buildPathFromAliases(const std::string& startName, const std::string& endName);
@@ -41,6 +40,32 @@ public:
 
     // === Getters (для доступа из других классов) ===
     GraphManager& getGraphManager() { return graphManager; }
+    std::string& getInputFrom() { return inputFrom; }
+    std::string& getInputTo() { return inputTo; }
+    const std::vector<std::string>& getCurrentSuggestions() const { return currentSuggestions; }
+    bool& getUserAllowStairs() { return userAllowStairs; }
+    bool& getUserAllowLift() { return userAllowLift; }
+    bool& getUserAllowBridge() { return userAllowBridge; }
+
+    // Access to debug info for the UI
+    const SDL_Point& getDebugMouseWorld() const { return debugMouseWorld; }
+    const Camera& getCamera() const { return camera; }
+
+    // Access to DEV mode state for the UI
+    const std::string& getInspectorNodeId() const { return inspectorNodeId; }
+    const std::string& getNeighborModeActiveId() const { return activeNodeId; }
+    bool isNeighborModeActive() const { return neighborMode; }
+    Uint32 getLastSaveTick() const { return lastSaveTick; }
+
+    // Setters and getters for UI state
+    void setEditingFrom(bool isEditingFrom) { editingFrom = isEditingFrom; }
+    bool isEditingFrom() const { return editingFrom; }
+
+    // Method to manually clear suggestions
+    void clearSuggestions() { currentSuggestions.clear(); }
+
+    // Метод для обновления подсказок, который будет вызываться каждый кадр
+    void updateSuggestions();
 
 private:
     // Даем классам-помощникам доступ к приватному состоянию этого класса
