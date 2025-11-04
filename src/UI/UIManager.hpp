@@ -16,4 +16,7 @@ private:
     void drawSearchWindow(MapViewer& mapViewer);
     void drawDevInfoWindow(MapViewer& mapViewer);
     void drawNodeInspector(MapViewer& mapViewer);
+    void drawTopNavBar(MapViewer& viewer);
+    void drawLeftSidebar(MapViewer& viewer);
+    void drawRightPanel(MapViewer& viewer);
 };

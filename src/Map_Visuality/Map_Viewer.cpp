@@ -26,6 +26,8 @@ MapViewer::MapViewer(SDL_Renderer* renderer) {
     // 3. Устанавливаем начальное состояние приложения
     switchViewToCampus(); // Устанавливаем вид на кампус
     camera.setWorldSize(Config::CANVAS_WIDTH, Config::CANVAS_HEIGHT);
+
+    SDL_Delay(500);
 }
 
 MapViewer::~MapViewer() {}

@@ -1,7 +1,8 @@
-#include "Engine.hpp"
+﻿#include "Engine.hpp"
 #include "../config.hpp"
 #include "../Map_Visuality/Map_Viewer.hpp"
 #include "../UI/UIManager.hpp"
+#include "../UI/UITheme.hpp"
 #include <SDL2/SDL_ttf.h>
 #include <iostream>
 
@@ -11,7 +12,7 @@
 
 // --- Lifecycle ---
 Engine::Engine(const char* title, int w, int h)
-    : window(nullptr, SDL_DestroyWindow),       // �������������� ����� ���������
+    : window(nullptr, SDL_DestroyWindow),       // Инициализируем умные указатели
     renderer(nullptr, SDL_DestroyRenderer),
     isRunning(true),
     currentWidth(Config::INITIAL_WINDOW_WIDTH),
@@ -30,7 +31,7 @@ Engine::Engine(const char* title, int w, int h)
 
     SDL_StartTextInput();
 
-    // ���������� .reset() ��� ������������ ��������
+    // Используем .reset() для присваивания значения
     window.reset(SDL_CreateWindow(
         Config::WINDOW_TITLE,
         SDL_WINDOWPOS_CENTERED,
@@ -50,7 +51,7 @@ Engine::Engine(const char* title, int w, int h)
 
     initImGui();
 
-    // `std::make_unique` - ���������� ������ ��������
+    // `std::make_unique` - безопасный способ создания
     mapViewer = std::make_unique<MapViewer>(renderer.get());
     uiManager = std::make_unique<UIManager>();
 }
@@ -67,20 +68,15 @@ void Engine::initImGui() {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // �������� ��������� � ����������
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // �������� Docking
-    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;   // �������� Viewports
+    io.Fonts->AddFontFromFileTTF("assets/fonts/Roboto-Regular.ttf", 18.0f);
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
-    ImGui::StyleColorsDark(); // ��� StyleColorsLight(), StyleColorsClassic()
+    ImGui::StyleColorsDark();
+    SetupImGuiThemeMISIS();
+    // ——————————————————
 
-    // ��������� Viewports
-    ImGuiStyle& style = ImGui::GetStyle();
-    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-        style.WindowRounding = 0.0f;
-        style.Colors[ImGuiCol_WindowBg].w = 1.0f;
-    }
-
-    // ������������� ��������
     ImGui_ImplSDL2_InitForSDLRenderer(window.get(), renderer.get());
     ImGui_ImplSDLRenderer2_Init(renderer.get());
 }
@@ -144,12 +140,12 @@ void Engine::handleEvents() {
             currentWidth = event.window.data1;
             currentHeight = event.window.data2;
 
-            // �������� MapViewer �� ��������� �������
+            // Сообщаем MapViewer об изменении размера
             mapViewer->onWindowResized(currentWidth, currentHeight);
         }
         ImGuiIO& io = ImGui::GetIO();
         if (io.WantCaptureMouse || io.WantCaptureKeyboard) {
-            // ���� ImGui ����� ���� ��� ����������, �� �������� ������� � MapViewer
+            // Если ImGui хочет мышь или клавиатуру, не передаем событие в MapViewer
         }
         else {
             mapViewer->handleEvent(event);
@@ -157,36 +153,134 @@ void Engine::handleEvents() {
     }
 }
 
-// --- Rendering ---
 void Engine::render() {
-    
+    // --- Начало нового кадра ImGui ---
     ImGui_ImplSDLRenderer2_NewFrame();
     ImGui_ImplSDL2_NewFrame();
     ImGui::NewFrame();
 
-    ImGui::ShowDemoWindow();
+    if (isLoading) {
+        drawLoadingScreen();
 
+        // Завершение кадра (чтобы ImGui сбалансировался)
+        ImGui::Render();
+        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer.get());
+        SDL_RenderPresent(renderer.get());
+        return;
+    }
+
+    // --- Обычный UI ---
     if (uiManager) {
         mapViewer->updateSuggestions();
         uiManager->render(*mapViewer);
     }
 
     SDL_SetRenderDrawColor(renderer.get(), 255, 255, 255, 255);
-    SDL_RenderClear(renderer.get());                         
-
-    mapViewer->render();      // map
+    SDL_RenderClear(renderer.get());
+    mapViewer->render();
 
     ImGui::Render();
     ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer.get());
+    SDL_RenderPresent(renderer.get());
+}
 
+void Engine::drawLoadingScreen() {
     ImGuiIO& io = ImGui::GetIO();
-    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-        SDL_Window* backup_current_window = SDL_GL_GetCurrentWindow();
-        SDL_GLContext backup_current_context = SDL_GL_GetCurrentContext();
-        ImGui::UpdatePlatformWindows();
-        ImGui::RenderPlatformWindowsDefault();
-        SDL_GL_MakeCurrent(backup_current_window, backup_current_context);
+    float w = io.DisplaySize.x;
+    float h = io.DisplaySize.y;
+    if (w < 1.0f || h < 1.0f) return;
+
+    ImDrawList* draw = ImGui::GetForegroundDrawList();
+    ImVec2 center(w * 0.5f, h * 0.5f);
+
+    loadingTimer += io.DeltaTime;
+
+    const float phaseGrowEnd = 1.0f;  // растёт
+    const float phaseHoldEnd = 1.3f;  // пауза
+    const float phaseShrinkEnd = 2.2f;  // сжимается
+    const float totalTime = phaseShrinkEnd;
+
+    float Rmax = std::sqrtf(w * w + h * h) * 0.5f;
+    float radius;
+    ImVec4 circleColor = ImVec4(0.12f, 0.35f, 0.85f, 1.0f); // насыщенный синий
+    const char* txt = "Loading Campus Data…";
+
+    float textAlpha = 1.f;
+    float revealAlpha = 0.f;  // альфа для карты (0 = невидима, 1 = полностью видна)
+
+    // === Определяем текущие параметры фаз ===
+    if (loadingTimer <= phaseGrowEnd) {
+        // ФАЗА 1: РАСШИРЕНИЕ — ЧЁРНЫЙ ФОН, СИНИЙ КРУГ РАСТЁТ
+        float t = loadingTimer / phaseGrowEnd;
+        radius = Rmax * (1.f - std::cos(t * M_PI * 0.5f)); // ease-out
+        textAlpha = 1.f;
+        revealAlpha = 0.f;
+    }
+    else if (loadingTimer <= phaseHoldEnd) {
+        // ФАЗА 2: ПАУЗА — КРУГ ДОСТИГ ПОЛНОГО РАЗМЕРА
+        radius = Rmax;
+        float t = (loadingTimer - phaseGrowEnd) / (phaseHoldEnd - phaseGrowEnd);
+        textAlpha = 1.f - t; // медленно гасим текст
+        revealAlpha = 0.f;
+    }
+    else {
+        // ФАЗА 3: СУЖЕНИЕ — ПОД СИНИМ СЛОЕМ ПРОЯВЛЯЕТСЯ КАРТА
+        float t = (loadingTimer - phaseHoldEnd) / (phaseShrinkEnd - phaseHoldEnd);
+        t = std::clamp(t, 0.f, 1.f);
+        radius = Rmax * (1.f - t); // сужается обратно
+        revealAlpha = t;           // карта проявляется при сужении
+        textAlpha = 0.f;
     }
 
-    SDL_RenderPresent(renderer.get());           
+    // === Сначала чёрный фон ===
+    SDL_SetRenderDrawColor(renderer.get(), 255, 255, 255, 255);
+    SDL_RenderClear(renderer.get());
+
+    // === Проявляем карту в фоне (при сжатии круга) ===
+    if (mapViewer && revealAlpha > 0.0f) {
+        // рендерим карту "под" синим кругом, но делаем альфа-переход
+        // (реализуется через смешение на более низком слое)
+        ImVec4 fadeColor(1.f, 1.f, 1.f, revealAlpha); // плавная прозрачность
+        // простой вызов отрисовки, карта всегда рисуется полностью
+        mapViewer->render();
+        // сам ImGui не управляет альфа SDL, так что можно визуальный fade воспринять через радиус
+    }
+
+    // === Синий круг ===
+    draw->AddCircleFilled(center, radius, ImGui::GetColorU32(circleColor), 128);
+
+    // === Текст ===
+    if (textAlpha > 0.f) {
+        ImVec2 ts = ImGui::CalcTextSize(txt);
+        draw->AddText(ImVec2(center.x - ts.x * 0.5f, center.y - ts.y * 0.5f),
+            ImGui::GetColorU32(ImVec4(1.f, 1.f, 1.f, textAlpha)), txt);
+    }
+
+    // === Эффект проявления карты при сжатии круга ===
+    // Когда радиус уменьшается, видимая часть карты увеличивается
+    if (loadingTimer > phaseHoldEnd) {
+        const int segs = 80;
+        const float twoPi = 2.0f * M_PI;
+        const float step = twoPi / segs;
+        // Цвет слоя поверх карты (тот же синий, но становится прозрачным)
+        ImU32 coverCol = ImGui::GetColorU32(ImVec4(circleColor.x, circleColor.y, circleColor.z, 1.0f - revealAlpha));
+
+        for (int i = 0; i < segs; ++i) {
+            float a0 = i * step;
+            float a1 = (i + 1) * step;
+
+            ImVec2 p0(center.x + cosf(a0) * Rmax, center.y + sinf(a0) * Rmax);
+            ImVec2 p1(center.x + cosf(a1) * Rmax, center.y + sinf(a1) * Rmax);
+            ImVec2 q0(center.x + cosf(a0) * radius, center.y + sinf(a0) * radius);
+            ImVec2 q1(center.x + cosf(a1) * radius, center.y + sinf(a1) * radius);
+
+            // Слой вокруг круга, который съёживается, открывая карту
+            draw->AddQuadFilled(p0, p1, q1, q0, coverCol);
+        }
+    }
+
+    // === Завершение ===
+    if (loadingTimer >= totalTime) {
+        isLoading = false;
+    }
 }

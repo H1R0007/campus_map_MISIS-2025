@@ -99,7 +99,7 @@ target_sources(campus_map PRIVATE
   ${imgui_SOURCE_DIR}/imgui_tables.cpp
   ${imgui_SOURCE_DIR}/imgui_widgets.cpp
   ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl2.cpp
-  ${imgui_SOURCE_DIR}/imgui_demo.cpp
+  # ${imgui_SOURCE_DIR}/imgui_demo.cpp
   ${imgui_SOURCE_DIR}/backends/imgui_impl_sdlrenderer2.cpp # Бэкенд для SDL_Renderer
 )
 

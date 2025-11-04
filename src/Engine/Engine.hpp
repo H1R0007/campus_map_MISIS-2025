@@ -17,6 +17,7 @@ public:
     void run();              // desktop loop
     void handleFrame();      // wasm loop (called each frame)
     void stop() { isRunning = false; }
+    void drawLoadingScreen();
 
     MapViewer& getMapViewer() { return *mapViewer; }
 
@@ -27,6 +28,9 @@ private:
     std::unique_ptr<UIManager> uiManager;
 
     bool isRunning;
+
+    bool isLoading = true;
+    float loadingTimer = 0.0f; // секунды от старта
 
     // Поля для хранения текущего состояния окна
     int currentWidth;

@@ -51,6 +51,10 @@ public:
     const SDL_Point& getDebugMouseWorld() const { return debugMouseWorld; }
     const Camera& getCamera() const { return camera; }
 
+    // === Accessors for external managers ===
+    AliasManager& getAliasManager() { return aliasManager; }
+    const AliasManager& getAliasManager() const { return aliasManager; }
+
     // Access to DEV mode state for the UI
     const std::string& getInspectorNodeId() const { return inspectorNodeId; }
     const std::string& getNeighborModeActiveId() const { return activeNodeId; }

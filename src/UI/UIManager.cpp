@@ -1,10 +1,17 @@
-#include "UIManager.hpp"
+п»ї#include "UIManager.hpp"
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "../Map_Visuality/Map_Viewer.hpp"
 #include "../config.hpp"
 #include <iostream>
 #include <string>
+
+namespace Layout {
+    constexpr float HEADER_HEIGHT = 60.0f;
+    constexpr float SIDEBAR_WIDTH = 260.0f;
+    constexpr float RIGHTBAR_WIDTH = 340.0f;
+    constexpr float WINDOW_MARGIN = 20.0f;
+}
 
 // Helper to use ImGui::InputText with std::string
 namespace ImGui {
@@ -16,126 +23,139 @@ namespace ImGui {
         }
         return 0;
     }
-    bool InputTextWithHint(const char* label, const char* hint, std::string* str, ImGuiInputTextFlags flags = 0) {
+    bool InputTextWithHint(const char* label, const char* hint,
+        std::string* str, ImGuiInputTextFlags flags = 0) {
         flags |= ImGuiInputTextFlags_CallbackResize;
-        return ImGui::InputTextWithHint(label, hint, str->data(), str->capacity() + 1, flags, InputTextCallback, (void*)str);
+        return ImGui::InputTextWithHint(
+            label, hint, str->data(), str->capacity() + 1,
+            flags, InputTextCallback, (void*)str);
     }
 }
 
-// --- Конструктор ---
+// --- РљРѕРЅСЃС‚СЂСѓРєС‚РѕСЂ ---
 UIManager::UIManager() {}
 
 // --- render() ---
-void UIManager::render(MapViewer& mapViewer) {
-    drawSearchWindow(mapViewer);
+void UIManager::render(MapViewer& viewer) {
+    // --- РЁР°РїРєР° ---
+    drawTopNavBar(viewer);
+
+    // --- Р›РµРІР°СЏ РїР°РЅРµР»СЊ РЅР°РІРёРіР°С†РёРё ("РёР·Р±СЂР°РЅРЅРѕРµ" РёР»Рё РјРµРЅСЋ) ---
+    ImGui::SetNextWindowPos(ImVec2(0, Layout::HEADER_HEIGHT));
+    ImGui::SetNextWindowSize(ImVec2(Layout::SIDEBAR_WIDTH, Config::INITIAL_WINDOW_HEIGHT - Layout::HEADER_HEIGHT));
+    drawLeftSidebar(viewer);  // СЃРґРµР»Р°РµРј РЅР° СЃР»РµРґСѓСЋС‰РµРј С€Р°РіРµ
+
+    // --- РћСЃРЅРѕРІРЅРѕРµ РѕРєРЅРѕ РїРѕРёСЃРєР° РјР°СЂС€СЂСѓС‚Р° ---
+    float routePanelX = Layout::SIDEBAR_WIDTH + Layout::WINDOW_MARGIN;
+    float routePanelY = Layout::HEADER_HEIGHT + Layout::WINDOW_MARGIN;
+    ImGui::SetNextWindowPos(ImVec2(routePanelX, routePanelY));
+    ImGui::SetNextWindowSize(ImVec2(420, 230));
+    drawSearchWindow(viewer);
 
 #ifndef __EMSCRIPTEN__
     if (Config::DEV_MODE) {
-        // Теперь мы вызываем отрисовку нового окна
-        drawDevInfoWindow(mapViewer);
-        drawNodeInspector(mapViewer);
+        float rightX = Config::INITIAL_WINDOW_WIDTH - Layout::RIGHTBAR_WIDTH - Layout::WINDOW_MARGIN;
+        float rightY = Layout::HEADER_HEIGHT + Layout::WINDOW_MARGIN;
+        ImGui::SetNextWindowPos(ImVec2(rightX, rightY));
+        ImGui::SetNextWindowSize(ImVec2(Layout::RIGHTBAR_WIDTH, 280));
+
+        ImGui::SetNextWindowPos(ImVec2(rightX,
+            rightY + 280 + Layout::WINDOW_MARGIN));
+        ImGui::SetNextWindowSize(ImVec2(Layout::RIGHTBAR_WIDTH, 260));
+        drawRightPanel(viewer);
     }
 #endif
 }
 
 void UIManager::drawSearchWindow(MapViewer& mapViewer) {
-    ImGui::SetNextWindowSize(ImVec2(300, 0));
-    ImGui::Begin("Route Search", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    // С„РёРєСЃРёСЂРѕРІР°РЅРЅР°СЏ РїР°РЅРµР»СЊ Р±РµР· СЂР°РјРєРё/Р·Р°РіРѕР»РѕРІРєР°
+    constexpr float FIELD_HEIGHT = 28.0f;
 
-    // --- Данные ---
-    std::string& fromStr = mapViewer.getInputFrom();
-    std::string& toStr = mapViewer.getInputTo();
+    if (ImGui::Begin("Route Planner", nullptr,
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoTitleBar))
+    {
+        std::string& fromStr = mapViewer.getInputFrom();
+        std::string& toStr = mapViewer.getInputTo();
 
-    // --- Поля ввода ---
-    if (ImGui::InputTextWithHint("##From", "From...", &fromStr)) {
-        mapViewer.setEditingFrom(true);
-        mapViewer.updateSuggestions();
-    }
-    if (ImGui::IsItemActive()) {
-        mapViewer.setEditingFrom(true);
-    }
-
-    if (ImGui::InputTextWithHint("##To", "To...", &toStr)) {
-        mapViewer.setEditingFrom(false);
-        mapViewer.updateSuggestions();
-    }
-    if (ImGui::IsItemActive()) {
-        mapViewer.setEditingFrom(false);
-    }
-
-    // --- Кнопка ---
-    ImGui::Spacing();
-    if (ImGui::Button("Find Path", ImVec2(-1, 0))) {
-        mapViewer.buildPathFromAliases(fromStr, toStr);
-    }
-
-    // --- Отрисовка подсказок (простая версия) ---
-    const auto& suggestions = mapViewer.getCurrentSuggestions();
-
-    // Временная переменная для отложенного обновления
-    std::string suggestionToApply = "";
-
-    if (!suggestions.empty() && ImGui::IsAnyItemActive()) {
+        ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "Campus Route Finder");
         ImGui::Separator();
-        ImGui::Text("Suggestions:");
+        ImGui::PushItemWidth(-1);
+
+        // --- Р’РІРѕРґ "From" ---
+        ImGui::InputTextWithHint("##from", "From location...", &fromStr);
+        if (ImGui::IsItemActivated()) mapViewer.setEditingFrom(true);
+
+        // --- Р’РІРѕРґ "To" ---
+        ImGui::InputTextWithHint("##to", "To location...", &toStr);
+        if (ImGui::IsItemActivated()) mapViewer.setEditingFrom(false);
+
+        // --- РљРЅРѕРїРєР° ---
         ImGui::Spacing();
+        if (ImGui::Button("рџљЂ  Build Path", ImVec2(-1, FIELD_HEIGHT))) {
+            mapViewer.buildPathFromAliases(fromStr, toStr);
+        }
 
-        for (const auto& suggestion : suggestions) {
-            // При клике мы НЕ МЕНЯЕМ ДАННЫЕ, а только запоминаем, что нужно сделать.
-            if (ImGui::Selectable(suggestion.c_str())) {
-                suggestionToApply = suggestion;
+        // --- РџРѕРґСЃРєР°Р·РєРё ---
+        const auto& suggestions = mapViewer.getCurrentSuggestions();
+        if (!suggestions.empty()) {
+            ImGui::Spacing();
+            ImGui::TextDisabled("Suggestions:");
+            ImGui::BeginChild("suggestions", ImVec2(0, 100), true);
+            for (const auto& s : suggestions) {
+                if (ImGui::Selectable(s.c_str())) {
+                    if (mapViewer.isEditingFrom()) fromStr = s;
+                    else                           toStr = s;
+                    mapViewer.clearSuggestions();
+                    break;
+                }
             }
+            ImGui::EndChild();
         }
+        ImGui::PopItemWidth();
     }
-
-    // --- Применение изменений ПОСЛЕ отрисовки ---
-    if (!suggestionToApply.empty()) {
-        if (mapViewer.isEditingFrom()) {
-            fromStr = suggestionToApply;
-        }
-        else {
-            toStr = suggestionToApply;
-        }
-        // Очищаем подсказки для следующего кадра.
-        mapViewer.clearSuggestions();
-    }
-
     ImGui::End();
 }
 
-// Stubs remain the same
+
+// === Info & Options ===
 void UIManager::drawDevInfoWindow(MapViewer& mapViewer) {
-    if (!ImGui::Begin("Info & Options")) {
+    if (!ImGui::Begin("в„№пёЏ  Info & Options", nullptr,
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoTitleBar))
+    {
         ImGui::End();
         return;
     }
 
-    // --- Debug Information ---
-    ImGui::Text("Debug Info"); ImGui::Separator();
     const Camera& camera = mapViewer.getCamera();
     const SDL_Point& mouseWorld = mapViewer.getDebugMouseWorld();
+
+    // --- Р Р°Р·РґРµР» В«Debug InfoВ» ---
+    ImGui::SeparatorText("Debug Info");
     ImGui::Text("Zoom: %.0f%%", camera.getScale() * 100.0f);
-    ImGui::Text("Mouse World: X=%d, Y=%d", mouseWorld.x, mouseWorld.y);
+    ImGui::Text("Mouse World: X=%d  Y=%d", mouseWorld.x, mouseWorld.y);
     ImGui::Text("Framerate: %.1f FPS", ImGui::GetIO().Framerate);
 
-    // --- Status Messages ---
-    // Показываем сообщение о режиме добавления соседей, если он активен
+    // --- РЎС‚Р°С‚СѓСЃС‹ / СЃРѕРѕР±С‰РµРЅРёСЏ ---
     if (mapViewer.isNeighborModeActive()) {
-        ImGui::Spacing(); ImGui::Separator();
-        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Neighbor Mode Active for: %s", mapViewer.getNeighborModeActiveId().c_str());
+        ImGui::SeparatorText("Status");
+        ImGui::TextColored(ImVec4(0.1f, 1.0f, 0.1f, 1.0f),
+            "Neighbor Mode for: %s",
+            mapViewer.getNeighborModeActiveId().c_str());
     }
 
-    // Показываем сообщение о сохранении
     Uint32 lastSaveTick = mapViewer.getLastSaveTick();
     if (lastSaveTick != 0 && SDL_GetTicks() - lastSaveTick < 2000) {
-        ImGui::Spacing(); ImGui::Separator();
-        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Graph Saved!");
+        ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "Graph Saved!");
     }
 
-    ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
-
-    // --- Pathfinding Options ---
-    ImGui::Text("Pathfinding Options"); ImGui::Separator();
+    // --- РќР°СЃС‚СЂРѕР№РєРё РїСѓС‚Рё ---
+    ImGui::SeparatorText("Pathfinding Options");
     ImGui::Checkbox("Allow Stairs [8]", &mapViewer.getUserAllowStairs());
     ImGui::Checkbox("Allow Lifts [9]", &mapViewer.getUserAllowLift());
     ImGui::Checkbox("Allow Bridges [0]", &mapViewer.getUserAllowBridge());
@@ -143,46 +163,344 @@ void UIManager::drawDevInfoWindow(MapViewer& mapViewer) {
     ImGui::End();
 }
 
-void UIManager::drawNodeInspector(MapViewer& mapViewer) {
-    const std::string& nodeId = mapViewer.getInspectorNodeId();
-    if (nodeId.empty()) {
-        return; // Если ни один узел не выбран для инспекции, ничего не делаем
-    }
 
-    // Получаем узел из GraphManager'а через MapViewer
-    const Node* node = mapViewer.getGraphManager().getNode(nodeId);
-    if (!node) {
-        // Узел мог быть удален, но ID остался. В этом случае просто перестаем его показывать.
-        // Можно добавить метод в MapViewer для сброса ID.
-        // mapViewer.clearInspectorNodeId();
-        return;
-    }
+// === Node Inspector ===
+// === Р’РµСЂС…РЅСЏСЏ РїР°РЅРµР»СЊ РЅР°РІРёРіР°С†РёРё (С‡РёСЃС‚С‹Р№ РІРёР·СѓР°Р»СЊРЅС‹Р№ СЃР»РѕР№) ===
+void UIManager::drawTopNavBar(MapViewer& viewer) {
+    using namespace Layout;
+    constexpr float HEADER_H = HEADER_HEIGHT;
+    constexpr float BUTTON_W = 110.0f;
+    constexpr float ITEM_GAP = 16.0f;
 
-    // Устанавливаем позицию и размер окна инспектора
-    ImGui::SetNextWindowSize(ImVec2(250, 0), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowPos(ImVec2(20, 200), ImGuiCond_FirstUseEver);
+    ImGuiIO& io = ImGui::GetIO();                      // С‡С‚РѕР±С‹ Р·РЅР°С‚СЊ СЂРµР°Р»СЊРЅС‹Р№ СЂР°Р·РјРµСЂ РѕРєРЅР°
+    float screenW = io.DisplaySize.x;
 
-    if (ImGui::Begin("Node Inspector", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Text("ID:"); ImGui::SameLine();
-        ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "%s", node->id.c_str());
+    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(screenW, HEADER_H), ImGuiCond_Always);
 
-        ImGui::Separator();
+    if (ImGui::Begin("TopNavBar", nullptr,
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags_NoScrollbar))
+    {
+        // Р“СЂР°РґРёРµРЅС‚РЅС‹Р№ С„РѕРЅ
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        ImVec2 pos = ImGui::GetWindowPos();
+        ImVec2 size = ImGui::GetWindowSize();
+        ImU32 c1 = ImGui::GetColorU32(ImVec4(0.08f, 0.22f, 0.45f, 1.0f));
+        ImU32 c2 = ImGui::GetColorU32(ImVec4(0.10f, 0.26f, 0.55f, 1.0f));
+        dl->AddRectFilledMultiColor(pos, ImVec2(pos.x + size.x, pos.y + size.y),
+            c1, c1, c2, c2);
 
-        ImGui::Text("Building: %s", node->building.c_str());
-        ImGui::Text("Floor: %d", node->floor);
-        ImGui::Text("Coords: (%d, %d)", node->x, node->y);
-        ImGui::Text("Is Portal: %s", node->isPortal ? "true" : "false");
+        // ==== Р›РћР“Рћ ====
+        ImGui::SetCursorPos(ImVec2(18, 14));
+        ImGui::TextColored(ImVec4(0.9f, 0.95f, 1.0f, 1.0f),
+            "рџЏ«  MISIS Campus Map 2025");
 
-        ImGui::Separator();
+        // ==== РџРћР›Р• РџРћРРЎРљРђ ====
+        float leftStart = SIDEBAR_WIDTH + ITEM_GAP * 2;
+        float availableW = screenW - SIDEBAR_WIDTH - RIGHTBAR_WIDTH
+            - BUTTON_W * 2 - ITEM_GAP * 6;
+        ImGui::SetCursorPos(ImVec2(leftStart, 12));
+        ImGui::PushItemWidth(availableW);
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(1, 1, 1, 0.95f));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.1f, 0.1f, 0.12f, 1.0f));
 
-        ImGui::Text("Neighbors (%zu):", node->neighbors.size());
-        // Используем дочернее окно со скроллбаром, если соседей много
-        if (ImGui::BeginChild("NeighborsList", ImVec2(0, 100), true)) {
-            for (const auto& neighborId : node->neighbors) {
-                ImGui::Selectable(neighborId.c_str());
+        static std::string query;
+        ImGui::InputTextWithHint("##SearchTopHint",
+            "Search for place or room...",
+            &query);
+
+        /*if (!query.empty() && query.size() > 1) {
+            auto suggestions = viewer.getAliasManager().suggest(query, 6);
+            if (!suggestions.empty()) {
+                ImGui::SetNextWindowPos(ImVec2(Layout::SIDEBAR_WIDTH + 40, Layout::HEADER_HEIGHT + 4));
+                ImGui::SetNextWindowSize(ImVec2(420, suggestions.size() * 28 + 14));
+                if (ImGui::Begin("SearchSuggest", nullptr,
+                    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar))
+                {
+                    for (auto& s : suggestions) {
+                        if (ImGui::Selectable(s.c_str())) {
+                            viewer.getInputFrom() = s;
+                            viewer.clearSuggestions();
+                            query.clear();
+                            break;
+                        }
+                    }
+                }
+                ImGui::End();
             }
         }
-        ImGui::EndChild();
+        */
+
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar();
+        ImGui::PopItemWidth();
+
+        // ==== РљРќРћРџРљР РЎРџР РђР’Рђ ====
+        float btnY = 12.0f;
+        float btnX = screenW - RIGHTBAR_WIDTH - BUTTON_W * 2 - ITEM_GAP * 3;
+        ImGui::SetCursorPos(ImVec2(btnX, btnY));
+
+        if (ImGui::Button("рџЊђ RU/EN", ImVec2(BUTTON_W, HEADER_H - 24))) {
+            std::cout << "[UI] Language toggle clicked\n";
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("в›¶ Fullscreen", ImVec2(BUTTON_W, HEADER_H - 24))) {
+            SDL_Window* win = SDL_GL_GetCurrentWindow();
+            Uint32 flags = SDL_GetWindowFlags(win);
+            bool isFull = (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) != 0;
+            SDL_SetWindowFullscreen(win, isFull ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP);
+        }
+
+        // ==== Р Р°Р·РґРµР»РёС‚РµР»СЊРЅР°СЏ Р»РёРЅРёСЏ (С‚РµРЅСЊ) ====
+        dl->AddLine(ImVec2(pos.x, pos.y + size.y - 1),
+            ImVec2(pos.x + size.x, pos.y + size.y - 1),
+            ImGui::GetColorU32(ImVec4(0, 0, 0, 0.35f)), 1.0f);
+
     }
     ImGui::End();
+}
+
+// === Р›РµРІР°СЏ Р±РѕРєРѕРІР°СЏ РїР°РЅРµР»СЊ (Sidebar / РР·Р±СЂР°РЅРЅРѕРµ) ===
+void UIManager::drawLeftSidebar(MapViewer& viewer) {
+    static bool collapsed = false;     // СЃРѕСЃС‚РѕСЏРЅРёРµ вЂ“ СЃРІРµСЂРЅСѓС‚Р° РёР»Рё РЅРµС‚
+    static int  selected = -1;        // РІС‹Р±СЂР°РЅРЅС‹Р№ РїСѓРЅРєС‚
+    constexpr float ITEM_HEIGHT = 38.0f;
+    constexpr float INDICATOR_WIDTH = 4.0f;
+
+    float sidebarWidth = collapsed ? 70.0f : Layout::SIDEBAR_WIDTH; // СѓР·РєР°СЏ РІ СЃРІРµСЂРЅСѓС‚РѕРј РІРёРґРµ
+    ImGui::SetNextWindowPos(ImVec2(0, Layout::HEADER_HEIGHT));
+    ImGui::SetNextWindowSize(ImVec2(sidebarWidth,
+        Config::INITIAL_WINDOW_HEIGHT - Layout::HEADER_HEIGHT));
+
+    if (ImGui::Begin("рџ“љ Sidebar", nullptr,
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoTitleBar))
+    {
+        // РљРЅРѕРїРєР°-РіР°РјР±СѓСЂРіРµСЂ СЃРІРµСЂРЅСѓС‚СЊ/СЂР°Р·РІРµСЂРЅСѓС‚СЊ
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        if (ImGui::Button(collapsed ? "в°" : "в°  Menu", ImVec2(-1, 40))) {
+            collapsed = !collapsed;
+        }
+        ImGui::PopStyleVar();
+        ImGui::Separator();
+
+        // РЎРїРёСЃРѕРє РёР·Р±СЂР°РЅРЅС‹С…
+        static const std::pair<const char*, const char*> items[] = {
+            { "рџ“љ", "Library" },
+            { "рџЌЅ", "Cafeteria" },
+            { "рџЏ‹пёЏ", "Gym" },
+            { "рџ§­", "Main Square" },
+            { "рџЏў", "Administrative" }
+        };
+
+        ImVec2 cursorStart = ImGui::GetCursorScreenPos();
+        for (int i = 0; i < IM_ARRAYSIZE(items); i++) {
+            // Р’С‹С‡РёСЃР»СЏРµРј СЃРѕСЃС‚РѕСЏРЅРёРµ
+            bool hovered = false;
+            bool clicked = false;
+
+            // РїРѕР·РёС†РёСЏ РєРЅРѕРїРєРё
+            ImVec2 pos = ImGui::GetCursorScreenPos();
+            ImVec2 size = ImVec2(ImGui::GetContentRegionAvail().x, ITEM_HEIGHT);
+
+            // С„РѕРЅ РїСЂРё РЅР°РІРµРґРµРЅРёРё / РІС‹Р±РѕСЂРµ
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            ImU32 bgColor = 0;
+            if (selected == i)
+                bgColor = ImGui::GetColorU32(ImVec4(0.18f, 0.44f, 0.85f, 1.0f));
+            else if (ImGui::IsMouseHoveringRect(pos, ImVec2(pos.x + size.x, pos.y + size.y)))
+                bgColor = ImGui::GetColorU32(ImVec4(0.25f, 0.25f, 0.30f, 1.0f));
+
+            if (bgColor)
+                dl->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), bgColor, 6.0f);
+
+            // Р°РєС‚РёРІРЅС‹Р№ РёРЅРґРёРєР°С‚РѕСЂ
+            if (selected == i) {
+                dl->AddRectFilled(ImVec2(pos.x, pos.y),
+                    ImVec2(pos.x + INDICATOR_WIDTH, pos.y + size.y),
+                    ImGui::GetColorU32(ImVec4(0.9f, 0.6f, 0.2f, 1.0f)));
+            }
+
+            // РЎРѕРґРµСЂР¶РёРјРѕРµ СЃС‚СЂРѕРєРё
+            ImGui::InvisibleButton(("##item" + std::to_string(i)).c_str(), size);
+            if (ImGui::IsItemHovered())
+                hovered = true;
+            if (ImGui::IsItemClicked())
+                clicked = true;
+
+            ImVec2 textPos = ImVec2(pos.x + 12.0f + (collapsed ? 0.0f : INDICATOR_WIDTH),
+                pos.y + 8.0f);
+
+            dl->AddText(textPos, ImGui::GetColorU32(ImGui::GetStyle().Colors[ImGuiCol_Text]),
+                items[i].first);
+
+            if (!collapsed) {
+                dl->AddText(ImVec2(textPos.x + 26.0f, pos.y + 8.0f),
+                    ImGui::GetColorU32(ImGui::GetStyle().Colors[ImGuiCol_Text]),
+                    items[i].second);
+            }
+
+            ImGui::SetCursorScreenPos(ImVec2(pos.x, pos.y + ITEM_HEIGHT + 6));
+
+            // СЂРµР°РєС†РёСЏ РЅР° РєР»РёРє
+            if (clicked) {
+                selected = i;
+                viewer.getInputFrom() = items[i].second; // Р·Р°РїРѕР»РЅСЏРµРј РїРѕР»Рµ РїРѕРёСЃРєР°
+                viewer.updateSuggestions();
+            }
+        }
+
+        // РќРёР· РїР°РЅРµР»Рё
+        ImGui::Dummy(ImVec2(0, 10));
+        ImGui::SeparatorText("System");
+
+        if (ImGui::Button("рџ’ѕ  Save", ImVec2(-1, 0))) {
+            std::cout << "Data save\n";
+        }
+        if (ImGui::Button("рџ”„  Reload", ImVec2(-1, 0))) {
+            std::cout << "Reload requested\n";
+        }
+
+    }
+    ImGui::End();
+}
+
+// === РџСЂР°РІР°СЏ РјСѓР»СЊС‚РёРІРєР»Р°РґРѕС‡РЅР°СЏ РїР°РЅРµР»СЊ (Info / Inspector / Console) ===
+void UIManager::drawRightPanel(MapViewer& viewer) {
+    using namespace Layout;
+    constexpr float MIN_PANEL_WIDTH = 320.0f;
+
+    ImGuiIO& io = ImGui::GetIO();
+    float screenW = io.DisplaySize.x;
+    float screenH = io.DisplaySize.y;
+
+    static float panelWidth = RIGHTBAR_WIDTH;
+#ifndef __EMSCRIPTEN__
+    // Р’ DEV-СЂРµР¶РёРјРµ СЂР°Р·СЂРµС€Р°РµРј "resize" С€РёСЂРёРЅС‹, СЃ Р»РёРјРёС‚Р°РјРё
+    if (Config::DEV_MODE) {
+        float newWidth = panelWidth;
+        ImGui::SetNextWindowPos(ImVec2(screenW - panelWidth, HEADER_HEIGHT));
+        ImGui::SetNextWindowSize(ImVec2(panelWidth, screenH - HEADER_HEIGHT));
+        if (ImGui::Begin("рџ§© Right Panel (Dev)", nullptr,
+            ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoTitleBar))
+        {
+
+            if (fabs(newWidth - panelWidth) > 1.0f)
+                panelWidth = newWidth;
+
+            ImGui::Dummy(ImVec2(0, 6));
+            if (ImGui::BeginTabBar("RightTabs", ImGuiTabBarFlags_FittingPolicyResizeDown)) {
+                // ==== Info ====
+                if (ImGui::BeginTabItem("в„№пёЏ Info")) {
+                    const Camera& cam = viewer.getCamera();
+                    const SDL_Point& pMouse = viewer.getDebugMouseWorld();
+                    ImGui::Text("Zoom %.0f%%", cam.getScale() * 100.f);
+                    ImGui::Text("Mouse: (%d,%d)", pMouse.x, pMouse.y);
+                    ImGui::EndTabItem();
+                }
+                // ==== Inspector ====
+                if (ImGui::BeginTabItem("рџ”Ќ Inspector")) {
+                    const std::string& nodeId = viewer.getInspectorNodeId();
+                    if (!nodeId.empty()) {
+                        const Node* n = viewer.getGraphManager().getNode(nodeId);
+                        if (n)
+                            ImGui::Text("Node: %s  [floor %d]", n->id.c_str(), n->floor);
+                    }
+                    else ImGui::TextDisabled("No node selected.");
+                    ImGui::EndTabItem();
+                }
+                // ==== Dev Console ====
+                if (ImGui::BeginTabItem("рџ› пёЏ Console")) {
+                    static char consoleBuf[512] = "";
+                    static std::vector<std::string> history;
+
+                    ImGui::BeginChild("ConsoleLog",
+                        ImVec2(-1, ImGui::GetContentRegionAvail().y - 40),
+                        true);
+                    for (auto& line : history)
+                        ImGui::TextUnformatted(line.c_str());
+                    ImGui::EndChild();
+
+                    ImGui::Separator();
+                    if (ImGui::InputText("##cmd", consoleBuf,
+                        IM_ARRAYSIZE(consoleBuf),
+                        ImGuiInputTextFlags_EnterReturnsTrue))
+                    {
+                        std::string cmd = consoleBuf;
+                        history.push_back("> " + cmd);
+                        if (cmd == "clear") history.clear();
+                        else if (cmd == "help")
+                            history.push_back("available: clear, help, reload, save");
+                        else if (cmd == "reload")
+                            history.push_back("[system] reload requested");
+                        else if (cmd == "save")
+                            history.push_back("[system] save requested");
+                        else history.push_back("[echo] " + cmd);
+
+                        *consoleBuf = 0;
+                        ImGui::SetScrollHereY(1.0f);
+                    }
+                    ImGui::EndTabItem();
+                }
+                ImGui::EndTabBar();
+            }
+        }
+        ImGui::End();
+    }
+    else
+#endif
+    {
+        // --- USER СЂРµР¶РёРј (Web Рё РѕР±С‹С‡РЅС‹Р№ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ)
+        float panelX = screenW - RIGHTBAR_WIDTH;
+        float panelY = HEADER_HEIGHT;
+        float panelW = RIGHTBAR_WIDTH;
+        float panelH = screenH - HEADER_HEIGHT;
+
+        ImGui::SetNextWindowPos(ImVec2(panelX, panelY), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(panelW, panelH), ImGuiCond_Always);
+
+        if (ImGui::Begin("рџ§© Right Panel", nullptr,
+            ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoTitleBar))
+        {
+            if (ImGui::BeginTabBar("RightTabsUser", ImGuiTabBarFlags_FittingPolicyResizeDown)) {
+
+                if (ImGui::BeginTabItem("в„№пёЏ Info")) {
+                    const Camera& cam = viewer.getCamera();
+                    const SDL_Point& pMouse = viewer.getDebugMouseWorld();
+                    ImGui::Text("Zoom %.0f%%", cam.getScale() * 100.f);
+                    ImGui::Text("Mouse: (%d,%d)", pMouse.x, pMouse.y);
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("рџ”Ќ Inspector")) {
+                    const std::string& id = viewer.getInspectorNodeId();
+                    if (id.empty())
+                        ImGui::TextDisabled("No node selected");
+                    else {
+                        const Node* n = viewer.getGraphManager().getNode(id);
+                        if (n)
+                            ImGui::Text("ID: %s  (%s)", n->id.c_str(), n->building.c_str());
+                    }
+                    ImGui::EndTabItem();
+                }
+
+                ImGui::EndTabBar();
+            }
+        }
+        ImGui::End();
+    }
 }
