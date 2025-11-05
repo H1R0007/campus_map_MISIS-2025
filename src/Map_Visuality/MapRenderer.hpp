@@ -15,6 +15,7 @@ struct Node;
 class MapRenderer {
 public:
     MapRenderer(SDL_Renderer* renderer);
+    // SDL_Renderer* getRenderer() const { return renderer; }
     ~MapRenderer();
 
     bool loadMapTexture(const std::string& path);

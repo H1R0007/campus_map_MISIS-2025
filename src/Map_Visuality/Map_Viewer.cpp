@@ -104,14 +104,18 @@ void MapViewer::switchToFloor(const std::string& buildingId, int floor) {
 
     for (const auto& f : bm->floors) {
         if (f.floor == floor) {
+            // начинаем плавный переход
+            transitionActive = true;
+            transitionStart = SDL_GetTicks();
+            transitionAlpha = 0.0f;
+            targetMapPath = "assets/buildings/" + bm->id + "/" + f.mapPath;
             currentView = ViewMode::BuildingFloor;
             currentBuilding = buildingId;
             currentFloor = f.floor;
 
-            graphManager.setActiveGraph(buildingId + "_floor_" + std::to_string(f.floor));
-            loadMap("assets/buildings/" + bm->id + "/" + f.mapPath);
+            graphManager.setActiveGraph(buildingId + "_floor_" + std::to_string(floor));
 
-            std::cout << "Switched to " << bm->name << " floor " << floor << "\n";
+            std::cout << "Starting fade transition to " << bm->name << " floor " << floor << "\n";
             return;
         }
     }
@@ -123,8 +127,14 @@ void MapViewer::switchViewToCampus() {
     currentBuilding.clear();
     currentFloor = 0;
     graphManager.setActiveGraph("__campus");
-    loadMap(Config::CAMPUS_MAP_PATH);
-    std::cout << "Switched to CAMPUS view\n";
+
+    // запускаем переход
+    transitionActive = true;
+    transitionStart = SDL_GetTicks();
+    transitionAlpha = 0.0f;
+    targetMapPath = Config::CAMPUS_MAP_PATH;
+
+    std::cout << "Starting fade transition to CAMPUS view\n";
 }
 
 // === Private Helpers ===
@@ -180,3 +190,7 @@ void MapViewer::updateSuggestions() {
         currentSuggestions = aliasManager.suggest(currentInput, 3);
     }
 }
+
+/*SDL_Renderer* MapViewer::getRenderer() {
+    return mapRenderer->getRenderer();
+}*/

@@ -175,7 +175,7 @@ void Engine::render() {
         uiManager->render(*mapViewer);
     }
 
-    SDL_SetRenderDrawColor(renderer.get(), 255, 255, 255, 255);
+    SDL_SetRenderDrawColor(renderer.get(), 235, 238, 243, 255);
     SDL_RenderClear(renderer.get());
     mapViewer->render();
 
@@ -233,7 +233,7 @@ void Engine::drawLoadingScreen() {
     }
 
     // === Сначала чёрный фон ===
-    SDL_SetRenderDrawColor(renderer.get(), 255, 255, 255, 255);
+    SDL_SetRenderDrawColor(renderer.get(), 235, 238, 243, 255);
     SDL_RenderClear(renderer.get());
 
     // === Проявляем карту в фоне (при сжатии круга) ===
