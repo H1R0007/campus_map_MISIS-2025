@@ -12,7 +12,7 @@ add_executable(campus_map
     src/Camera/Camera.cpp
     src/map/Graph.cpp
     src/path_finder/path_finder.cpp
- "src/aliases/AliasManager.cpp" "src/map/TransitionManager.cpp" "src/map/GraphManager.cpp" "src/map/MetaLoader.cpp" "src/history/HistoryManager.cpp")
+ "src/aliases/AliasManager.cpp" "src/map/TransitionManager.cpp" "src/map/GraphManager.cpp" "src/map/MetaLoader.cpp" "src/history/HistoryManager.cpp" "src/Map_Visuality/MapRenderer.cpp" "src/Input/InputHandler.cpp")
 
 option(USE_SDL_IMAGE "Use SDL2_image (PNG, JPG, etc.)" ON)
 option(USE_SDL_TTF   "Use SDL2_ttf (fonts)"            ON)
@@ -42,8 +42,6 @@ if (EMSCRIPTEN)
     list(APPEND EM_FLAGS "-sASSERTIONS=2" "-sSAFE_HEAP=1")
   endif()
   if (EXISTS "${CMAKE_SOURCE_DIR}/assets")
-    set_target_properties(campus_map PROPERTIES SUFFIX ".html")
-    set_target_properties(campus_map PROPERTIES OUTPUT_NAME "index")
 
     target_link_options(campus_map PRIVATE
     "--shell-file=${CMAKE_SOURCE_DIR}/web_shell.html"

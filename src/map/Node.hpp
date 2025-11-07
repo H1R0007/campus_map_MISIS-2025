@@ -15,7 +15,7 @@ struct Node {
     int floor = 0;             // floor index (0 = campus level)
 
     // --- Context ---
-    std::string building;      // building ID (e.g. "Building_A", "CAMPUS")
+    std::string building = "CAMPUS";      // building ID (e.g. "Building_A", "CAMPUS")
     bool isPortal = false;     // true if node is a portal (entrance, stair, lift...)
 
     // --- Graph edges ---

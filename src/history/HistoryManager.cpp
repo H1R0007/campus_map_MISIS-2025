@@ -1,11 +1,14 @@
 #include "HistoryManager.hpp"
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include <iostream>
 
 using json = nlohmann::json;
 
 // === Core API ===
+constexpr size_t MAX_HISTORY = 200;
 void HistoryManager::push(const HistoryAction& action) {
+    if (undoStack.size() > MAX_HISTORY) undoStack.erase(undoStack.begin());
     undoStack.push_back(action);
     redoStack.clear(); // new action invalidates redo stack
 }
@@ -43,5 +46,9 @@ void HistoryManager::dumpToFile(const std::string& path) const {
             });
     }
     std::ofstream f(path);
+    if (!f.is_open()) {
+        std::cerr << "Failed to write history dump: " << path << "\n";
+        return;
+    }
     f << j.dump(4);
 }

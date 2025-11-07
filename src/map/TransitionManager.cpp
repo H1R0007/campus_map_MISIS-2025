@@ -11,63 +11,60 @@ using json = nlohmann::json;
 bool TransitionManager::loadFromJson(const std::string& path) {
     std::ifstream file(path);
     if (!file.is_open()) {
-        std::cerr << "Failed to open transitions: " << path << "\n";
+        std::cerr << "Failed to open transitions file: " << path << "\n";
         return false;
     }
 
-    json j;
+    nlohmann::json j;
     try {
         file >> j;
     }
     catch (const std::exception& e) {
-        std::cerr << "TransitionManager: parse error " << e.what() << "\n";
+        std::cerr << "[TransitionManager] Parse error in " << path
+            << ": " << e.what() << "\n";
         return false;
     }
 
     if (!j.contains("transitions") || !j["transitions"].is_array()) {
-        std::cerr << "TransitionManager: invalid structure (no transitions)\n";
+        std::cerr << "[TransitionManager] Invalid structure (" << path << ")\n";
         return false;
     }
 
-    // Ensure uniqueness Ч avoid duplicates like A<->B twice
     transitions.clear();
     std::set<std::pair<std::string, std::string>> uniq;
 
     for (auto& t : j["transitions"]) {
-
-        if (!t.contains("from") || !t.contains("to")) {
-            std::cerr << "TransitionManager: missing from/to\n";
+        // Ѕазовые проверки
+        if (!t.contains("from") || !t.contains("to")
+            || !t["from"].contains("node") || !t["to"].contains("node")) {
+            std::cerr << "[TransitionManager] Skipping malformed entry in " << path << "\n";
             continue;
         }
 
-        if (!t["from"].contains("node") || !t["to"].contains("node")) {
-            std::cerr << "TransitionManager: invalid transition format\n";
-            continue;
-        }
-
-        Transition tr;
-        tr.fromNode = t["from"]["node"];
-        tr.toNode = t["to"]["node"];
-
+        std::string a = t["from"]["node"].get<std::string>();
+        std::string b = t["to"]["node"].get<std::string>();
         std::string typeStr = t.value("transition_type", "unknown");
-        tr.type = parseTransitionType(typeStr);
 
-        auto key = std::minmax(tr.fromNode, tr.toNode);
+        auto key = std::minmax(a, b);
         if (uniq.count(key)) {
-            std::cerr << "TransitionManager: duplicate transition " << tr.fromNode
-                << " <-> " << tr.toNode << "\n";
+            std::cerr << "[TransitionManager] Duplicate transition " << a << " <-> " << b << "\n";
             continue;
         }
         uniq.insert(key);
 
+        Transition tr{ a, b, parseTransitionType(typeStr) };
         transitions.push_back(tr);
     }
-    std::cout << "Loaded " << transitions.size() << " transitions\n";
-    return true;
+
+    std::cout << "[TransitionManager] Loaded " << transitions.size()
+        << " transitions from " << path << "\n";
+    return !transitions.empty();
 }
 
 bool TransitionManager::saveToJson(const std::string& path) const {
-    json j;
+    nlohmann::json j;
+    j["transitions"] = nlohmann::json::array();
+
     for (auto& tr : transitions) {
         j["transitions"].push_back({
             {"from", { {"node", tr.fromNode} }},
@@ -77,7 +74,10 @@ bool TransitionManager::saveToJson(const std::string& path) const {
     }
 
     std::ofstream file(path);
-    if (!file.is_open()) return false;
+    if (!file.is_open()) {
+        std::cerr << "Failed to save transitions: " << path << "\n";
+        return false;
+    }
     file << j.dump(4);
     return true;
 }
@@ -96,6 +96,10 @@ std::vector<std::string> TransitionManager::getLinkedNodes(const std::string& no
 
 // === Editing ===
 void TransitionManager::addTransition(const Transition& t) {
+    if (t.fromNode == t.toNode) {
+        std::cerr << "[TransitionManager] Ignored self-loop " << t.fromNode << "\n";
+        return;
+    }
     for (auto& existing : transitions) {
         if ((existing.fromNode == t.fromNode && existing.toNode == t.toNode) ||
             (existing.fromNode == t.toNode && existing.toNode == t.fromNode)) {

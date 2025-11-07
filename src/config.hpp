@@ -3,8 +3,8 @@
 namespace Config {
 
     // === Window parameters ===
-    inline int WINDOW_WIDTH = 800;
-    inline int WINDOW_HEIGHT = 600;
+    constexpr int INITIAL_WINDOW_WIDTH = 800;
+    constexpr int INITIAL_WINDOW_HEIGHT = 600;
     constexpr const char* WINDOW_TITLE = "Campus Map";
 
     // === Campus and maps ===
@@ -32,15 +32,27 @@ namespace Config {
     constexpr const char* FONT_PATH = "assets/fonts/Roboto-Regular.ttf";
 
     // === Build/runtime modes ===
-    constexpr bool BUILD_DEV = true;    // compile-time: dev or release
-    inline bool DEV_MODE = BUILD_DEV;   // runtime mode
+
+#ifdef __EMSCRIPTEN__
+// For web builds, DEV mode is always disabled at compile time.
+    constexpr bool BUILD_DEV = false;
+    inline bool DEV_MODE = false;
+
+    inline void toggleDevMode() { /* Does nothing in web build */ }
+
+#else
+    // For native builds, allow DEV mode to be toggled.
+    constexpr bool BUILD_DEV = true;
+    inline bool DEV_MODE = BUILD_DEV;
 
     inline void toggleDevMode() {
         if constexpr (BUILD_DEV) {
             DEV_MODE = !DEV_MODE;
         }
     }
+#endif
 
+    // This function remains to allow forcing user mode in native dev builds if needed.
     inline void forceUserMode() {
         DEV_MODE = false;
     }

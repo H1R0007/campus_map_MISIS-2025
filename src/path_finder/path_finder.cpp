@@ -4,6 +4,7 @@
 #include <limits>
 #include <cmath>
 #include <algorithm>
+#include <iostream>
 
 // === Heuristic (private) ===
 // Approximates distance between nodes for A* priority.
@@ -62,6 +63,8 @@ std::vector<std::string> find_shortest_path(
     const GraphManager& graphManager,
     const PathFinderOptions& options
 ) {
+    const int MAX_VISITS = 10000;
+    int visits = 0;
     // Guard: ensure start/end exist
     if (graphManager.getNode(start_id) == nullptr ||
         graphManager.getNode(end_id) == nullptr) {
@@ -79,6 +82,10 @@ std::vector<std::string> find_shortest_path(
                                         *graphManager.getNode(end_id)) });
 
     while (!open_set.empty()) {
+        if (++visits > MAX_VISITS) {
+            std::cerr << "[PathFinder] Warning: iteration limit hit (possible loop)\n";
+            break;
+        }
         auto current = open_set.top().id;
         open_set.pop();
 

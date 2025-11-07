@@ -1,99 +1,113 @@
-#pragma once
+﻿#pragma once
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
-#include <SDL2/SDL_ttf.h>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "../Camera/Camera.hpp"
 #include "../path_finder/path_finder.hpp"
 #include "../aliases/AliasManager.hpp"
 #include "../map/GraphManager.hpp"
 
+// Вперед объявляем классы-помощники
+class MapRenderer;
+class InputHandler;
+
 // === ViewMode ===
-// Either entire campus view, or a specific building floor.
+// Определяет, что сейчас отображается: карта всего кампуса или этаж здания.
 enum class ViewMode { Campus, BuildingFloor };
 
 // === MapViewer ===
-// Main visualization layer: renders campus/buildings/floors, handles input,
-// overlays (search box, dev mode info), and user pathfinding.
+// Главный класс-координатор. Хранит состояние приложения,
+// делегирует отрисовку классу MapRenderer, а обработку ввода - InputHandler.
 class MapViewer {
 public:
-    MapViewer(SDL_Renderer* renderer, const char* mapPath);
+    MapViewer(SDL_Renderer* renderer);
     ~MapViewer();
 
-    // === Lifecycle ===
+    // === Жизненный цикл ===
     void onWindowResized(int w, int h);
-
-    // === Rendering ===
-    void render();         // draw map + dev layers + path
-    void renderOverlay();  // UI overlays (scale, coords, search inputs, etc.)
-
-    // === Events ===
     void handleEvent(SDL_Event& event);
 
-    // === Pathfinding ===
+    // === Отрисовка ===
+    void render();        // Отрисовка основной сцены (карта, узлы, пути)
+    void renderOverlay(); // Отрисовка UI поверх сцены (поля ввода, подсказки и т.д.)
+
+    // === Методы-действия (вызываются из InputHandler) ===
     void buildPathFromAliases(const std::string& startName, const std::string& endName);
     void switchToFloor(const std::string& buildingId, int floor);
+    void switchViewToCampus();
+    void createNodeLine(const SDL_Point& startWorld, float angleDeg, int count, int step);
 
-    // === Getters ===
+    // === Getters (для доступа из других классов) ===
     GraphManager& getGraphManager() { return graphManager; }
 
 private:
-    // === Core state ===
+    // Даем классам-помощникам доступ к приватному состоянию этого класса
+    friend class InputHandler;
+    friend class MapRenderer;
+
+    // --- Компоненты ---
     GraphManager graphManager;
     AliasManager aliasManager;
     Camera camera;
+    std::unique_ptr<MapRenderer> mapRenderer;
+    std::unique_ptr<InputHandler> inputHandler;
 
-    SDL_Texture* mapTexture = nullptr;
-    SDL_Renderer* renderer;
-    SDL_Point mapSize;
-    SDL_Rect mapRect;
-    SDL_Point lastMousePos;
-    SDL_Point debugMouseWorld{ 0,0 };
-    TTF_Font* font = nullptr;
-
-    // === Path selection ===
-    std::string startNodeId;
-    std::string endNodeId;
+    // --- Состояние вида и навигации ---
+    ViewMode currentView = ViewMode::Campus;
+    std::string currentBuilding;
+    int currentFloor = 0;
     std::vector<std::string> currentPath;
 
-    // === Neighbor editing (dev mode) ===
+    // --- Состояние DEV-режима и инструментов ---
+    SDL_Point debugMouseWorld{ 0,0 };
+    const Node* hoveredNode = nullptr;
     std::string activeNodeId;
     bool neighborMode = false;
     std::vector<std::string> pendingNeighbors;
     std::string portalStartNode;
+    std::string inspectorNodeId;
+    std::string startNodeId; // Для выбора начальной точки пути в DEV-режиме
+    std::string endNodeId;   // Для выбора конечной точки пути в DEV-режиме
 
-    // === Overlay UI ===
-    std::string inputFrom;
-    std::string inputTo;
-    bool editingFrom = true; // true = redact "OTKYDA", false = redact "KYDA"
+    // Инструмент "Линия"
+    bool lineToolActive = false;
+    bool lineToolFirstPointSet = false;
+    SDL_Point lineToolStart{};
+    SDL_Point lineToolEnd{};
+    float lineToolAngleDeg = 0.0f;
+    float lineToolDistance = 0.0f;
+    int lineToolCount = 5;
+    int lineToolStep = 100;
+    bool lineToolReady = false;
+
+    // --- Состояние UI (поиск маршрута) ---
+    std::string inputFrom, inputTo;
+    bool editingFrom = true;
     int selectedSuggestionIndex = -1;
     std::vector<std::string> currentSuggestions;
+    bool inputActive = false;
+    SDL_Rect fromFieldRect{}, toFieldRect{}; // Области для кликов по полям ввода
     Uint32 lastSaveTick = 0;
 
-    // === View control ==
-    ViewMode currentView = ViewMode::Campus;
-    std::string currentBuilding;
-    int currentFloor = 0;
-
-    // User options
+    // --- Настройки пользователя и отладки ---
     bool userAllowStairs = true;
     bool userAllowLift = true;
     bool userAllowBridge = true;
+    bool debugDrawNodes = true; // Показывать/скрывать узлы в DEV-режиме
 
-    // Dev inspector
-    bool debugDrawNodes = true;
-    const Node* hoveredNode = nullptr;
-    std::string inspectorNodeId;
+    // --- Приватные хелперы, используемые внутри класса ---
+    void loadMap(const std::string& path);
 
-    // === Private helpers ===
-    void loadMap(const char* path);
-
-    // Helper: find node under cursor screen coordinates. 
-    // Returns empty string if nothing found.
-    std::string findNodeUnderCursor(const SDL_Point& clickScreen, int radius = 25) const {
-        const auto& nodesHere =
-            (currentView == ViewMode::Campus) ? graphManager.getCampusNodes()
+    // Поиск узла под курсором. Используется InputHandler'ом для определения цели клика.
+    // Возвращает ID узла или пустую строку.
+    std::string findNodeUnderCursor(const SDL_Point& clickScreen, int radius = 15) const {
+        const auto& nodesHere = (currentView == ViewMode::Campus)
+            ? graphManager.getCampusNodes()
             : graphManager.getActiveNodes();
-        for (auto& [id, node] : nodesHere) {
+
+        for (const auto& [id, node] : nodesHere) {
             SDL_Point scr = camera.worldToScreen({ node.x, node.y });
             int dx = scr.x - clickScreen.x;
             int dy = scr.y - clickScreen.y;
@@ -103,21 +117,4 @@ private:
         }
         return "";
     }
-
-    // === Input fields (route search) ===
-    SDL_Rect fromFieldRect{};   // hitbox of "OTKYDA" field
-    SDL_Rect toFieldRect{};     // hitbox of "KYDA" field
-    bool inputActive = false;   // true if any input field focused
-
-    // === Create nodes in line ===
-    void createNodeLine(const SDL_Point& startWorld, float angleDeg, int count, int step);
-    bool lineToolActive = false;
-    bool lineToolFirstPointSet = false;
-    SDL_Point lineToolStart{};
-    SDL_Point lineToolEnd{};
-    float lineToolAngleDeg = 0.0f;
-    float lineToolDistance = 0.0f;
-    int lineToolCount = 5;    // ������� ����� (�� ���������)
-    int lineToolStep = 100;   // ���� count �� �����, ������������� �� step
-    bool lineToolReady = false;  // ���� ���������� ���������
 };

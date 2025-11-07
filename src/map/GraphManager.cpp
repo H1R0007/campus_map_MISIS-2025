@@ -1,5 +1,6 @@
 ﻿#include "GraphManager.hpp"
 #include "MetaLoader.hpp"
+#include "../utils/safe_stoi.hpp"
 #include <iostream>
 #include <nlohmann/json.hpp>
 
@@ -60,6 +61,14 @@ const BuildingMeta* GraphManager::getBuildingMeta(const std::string& id) const {
 // === Navigation Helpers ===
 const Node* GraphManager::getNode(const std::string& id) const {
     if (const Node* n = campusGraph.getNode(id)) return n;
+
+    // Ищем в активном графе, если он есть
+    if (graphs.count(activeKey)) {
+        if (const Node* n = graphs.at(activeKey).getNode(id)) {
+            return n;
+        }
+    }
+
     for (auto& [k, g] : graphs) {
         if (const Node* n = g.getNode(id)) return n;
     }
@@ -67,21 +76,15 @@ const Node* GraphManager::getNode(const std::string& id) const {
 }
 
 std::vector<std::string> GraphManager::getNeighbors(const std::string& id) const {
-    std::vector<std::string> res;
-
-    if (const Node* n = campusGraph.getNode(id))
-        res.insert(res.end(), n->neighbors.begin(), n->neighbors.end());
-
-    for (auto& [k, g] : graphs) {
-        if (const Node* n = g.getNode(id)) {
-            res.insert(res.end(), n->neighbors.begin(), n->neighbors.end());
-            break;
-        }
+    const Node* node = getNode(id);
+    if (!node) {
+        return {};
     }
 
-    // плюс переходы
-    auto extra = transitions.getLinkedNodes(id);
-    res.insert(res.end(), extra.begin(), extra.end());
+    std::vector<std::string> res = node->neighbors; 
+
+    auto transitionNeighbors = transitions.getLinkedNodes(id);
+    res.insert(res.end(), transitionNeighbors.begin(), transitionNeighbors.end());
 
     return res;
 }
@@ -131,6 +134,8 @@ std::string GraphManager::addNode(int x, int y, int floor) {
 
         // Префикс: A / B / C и т.п.
         std::string prefix = buildingId.substr(buildingId.find("_") + 1);
+        // prefix = "A"
+
         id = prefix + "_" + std::to_string(nodeFloor) + "_NODE_" + std::to_string(globalNextId++);
 
         graphs[activeKey].loadNode(id, x, y, nodeFloor, {});
@@ -177,6 +182,14 @@ void GraphManager::removeNodeById(const std::string& id) {
         {"neighbors", victim->neighbors}
     };
 
+    auto transitions_to_check = transitions.getTransitions();
+    for (const auto& tr : transitions_to_check) {
+        if (tr.fromNode == id || tr.toNode == id) {
+            // This call will trigger its own history push if not in undo/redo mode
+            removeTransition(tr.fromNode, tr.toNode);
+        }
+    }
+
     if (activeKey == "__campus") {
         campusGraph.removeNodeById(id);
     }
@@ -189,6 +202,7 @@ void GraphManager::removeNodeById(const std::string& id) {
     }
 }
 
+
 void GraphManager::addNeighbor(const std::string& a, const std::string& b) {
     if (activeKey == "__campus") {
         campusGraph.addNeighbor(a, b);
@@ -198,7 +212,7 @@ void GraphManager::addNeighbor(const std::string& a, const std::string& b) {
     }
 
     if (!performingUndoRedo) {
-        history.push({ ActionType::RemoveNeighbor, a, b, "" });
+        history.push({ ActionType::AddNeighbor, a, b, "" });
     }
 }
 
@@ -211,7 +225,7 @@ void GraphManager::removeNeighbor(const std::string& a, const std::string& b) {
     }
 
     if (!performingUndoRedo) {
-        history.push({ ActionType::AddNeighbor, a, b, "" });
+        history.push({ ActionType::RemoveNeighbor, a, b, "" });
     }
 }
 
@@ -221,9 +235,12 @@ void GraphManager::addTransition(const Transition& t) {
     if (Node* n = const_cast<Node*>(getNode(t.fromNode))) {
         n->isPortal = true;
     }
+    else std::cerr << "Transition target missing\n";
+
     if (Node* n = const_cast<Node*>(getNode(t.toNode))) {
         n->isPortal = true;
     }
+    else std::cerr << "Transition target missing\n";
 
     if (!performingUndoRedo) {
         history.push({ ActionType::AddTransition, t.fromNode, t.toNode, transitionTypeToString(t.type) });
@@ -264,6 +281,11 @@ void GraphManager::removeTransition(const std::string& from, const std::string& 
 
 // === Save/load ===
 void GraphManager::saveActive() {
+#ifdef __EMSCRIPTEN__
+    std::cout << "[GraphManager] saveActive() ignored in WebAssembly environment\n";
+    return;
+#endif
+
     if (activeKey == "__campus") {
         campusGraph.saveToJson("assets/campus/graph.json");
     }
@@ -308,27 +330,32 @@ void GraphManager::undoGlobal() {
     if (!act) return;
 
     performingUndoRedo = true;
-    switch (act->type) {
-    case ActionType::AddNode:
-        removeNodeById(act->data1);
-        break;
-    case ActionType::RemoveNode:
-        restoreNodeFromJson(act->extra);
-        break;
-    case ActionType::AddNeighbor:
-        removeNeighbor(act->data1, act->data2);
-        break;
-    case ActionType::RemoveNeighbor:
-        addNeighbor(act->data1, act->data2);
-        break;
-    case ActionType::AddTransition:
-        removeTransition(act->data1, act->data2);
-        break;
-    case ActionType::RemoveTransition:
-        addTransition({ act->data1, act->data2, parseTransitionType(act->extra) });
-        break;
-    default:
-        break;
+    try {
+        switch (act->type) {
+        case ActionType::AddNode:
+            removeNodeById(act->data1);
+            break;
+        case ActionType::RemoveNode:
+            restoreNodeFromJson(act->extra);
+            break;
+        case ActionType::AddNeighbor:
+            removeNeighbor(act->data1, act->data2);
+            break;
+        case ActionType::RemoveNeighbor:
+            addNeighbor(act->data1, act->data2);
+            break;
+        case ActionType::AddTransition:
+            removeTransition(act->data1, act->data2);
+            break;
+        case ActionType::RemoveTransition:
+            addTransition({ act->data1, act->data2, parseTransitionType(act->extra) });
+            break;
+        default:
+            break;
+        }
+    }
+    catch (...) {
+        std::cerr << "[GraphManager] Undo/Redo failed\n";
     }
     performingUndoRedo = false;
 }
@@ -337,29 +364,35 @@ void GraphManager::redoGlobal() {
     auto act = history.redo();
     if (!act) return;
 
-    performingUndoRedo = true;
-    switch (act->type) {
-    case ActionType::AddNode:
-        restoreNodeFromJson(act->extra);
-        break;
-    case ActionType::RemoveNode:
-        removeNodeById(act->data1);
-        break;
-    case ActionType::AddNeighbor:
-        addNeighbor(act->data1, act->data2);
-        break;
-    case ActionType::RemoveNeighbor:
-        removeNeighbor(act->data1, act->data2);
-        break;
-    case ActionType::AddTransition:
-        addTransition({ act->data1, act->data2, parseTransitionType(act->extra) });
-        break;
-    case ActionType::RemoveTransition:
-        removeTransition(act->data1, act->data2);
-        break;
-    default:
-        break;
+    try {
+        performingUndoRedo = true;
+        switch (act->type) {
+        case ActionType::AddNode:
+            restoreNodeFromJson(act->extra);
+            break;
+        case ActionType::RemoveNode:
+            removeNodeById(act->data1);
+            break;
+        case ActionType::AddNeighbor:
+            addNeighbor(act->data1, act->data2);
+            break;
+        case ActionType::RemoveNeighbor:
+            removeNeighbor(act->data1, act->data2);
+            break;
+        case ActionType::AddTransition:
+            addTransition({ act->data1, act->data2, parseTransitionType(act->extra) });
+            break;
+        case ActionType::RemoveTransition:
+            removeTransition(act->data1, act->data2);
+            break;
+        default:
+            break;
+        }
     }
+    catch (...) {
+        std::cerr << "[GraphManager] Undo/Redo failed\n";
+    }
+
     performingUndoRedo = false;
 }
 
@@ -411,11 +444,10 @@ void GraphManager::recalculateGlobalNextId() {
     int maxId = 1;
 
     auto extractIdNum = [](const std::string& id) -> int {
-        // выдергиваем последний числовой суффикс из вида "A_1_NODE_27"
+        // безопасно выдергиваем последний числовой суффикс, например "A_1_NODE_27" → 27
         size_t pos = id.find_last_of('_');
-        if (pos != std::string::npos) {
-            try { return std::stoi(id.substr(pos + 1)); }
-            catch (...) { return 0; }
+        if (pos != std::string::npos && pos + 1 < id.size()) {
+            return safeStoi(id.substr(pos + 1), 0);
         }
         return 0;
         };
@@ -424,12 +456,12 @@ void GraphManager::recalculateGlobalNextId() {
     for (auto& [_, node] : campusGraph.getNodes()) {
         maxId = std::max(maxId, extractIdNum(node.id));
     }
-    for (auto& [key, g] : graphs) {
-        for (auto& [_, node] : g.getNodes()) {
+    for (auto& [_, nodeSet] : graphs) {
+        for (auto& [_, node] : nodeSet.getNodes()) {
             maxId = std::max(maxId, extractIdNum(node.id));
         }
     }
 
     globalNextId = maxId + 1;
-    std::cout << "[GraphManager] globalNextId recalculated -> " << globalNextId << "\n";
+    std::cout << "[GraphManager] globalNextId recalculated -> " << globalNextId << std::endl;
 }

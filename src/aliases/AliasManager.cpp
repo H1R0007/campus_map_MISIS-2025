@@ -11,8 +11,13 @@ using json = nlohmann::json;
 std::string AliasManager::normalize(const std::string& s) {
     std::string res = s;
     std::transform(res.begin(), res.end(), res.begin(),
-        [](unsigned char c) { return std::tolower(c); });
-    return res;
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+    // обрезаем пробелы в начале/конце
+    size_t start = res.find_first_not_of(" \t\n\r");
+    size_t end = res.find_last_not_of(" \t\n\r");
+    if (start == std::string::npos) return "";
+    return res.substr(start, end - start + 1);
 }
 
 // === Initialization / Loading ===
@@ -22,6 +27,9 @@ bool AliasManager::load(const std::string& path) {
         std::cerr << "AliasManager: failed to open " << path << "\n";
         return false;
     }
+
+    aliasToId.clear();
+    idToAliases.clear();
 
     json j;
     try {
@@ -36,9 +44,6 @@ bool AliasManager::load(const std::string& path) {
         std::cerr << "AliasManager: invalid structure, expected {\"aliases\": [...]}\n";
         return false;
     }
-
-    aliasToId.clear();
-    idToAliases.clear();
 
     std::unordered_set<std::string> ids;
 
@@ -82,10 +87,12 @@ std::vector<std::string> AliasManager::suggest(const std::string& partial, size_
 
     for (auto& [aliasNorm, id] : aliasToId) {
         if (aliasNorm.find(norm) != std::string::npos) {
-            // вернуть оригинал (как он был записан в idToAliases)
-            for (auto& alias : idToAliases.at(id)) {
-                if (results.size() < limit)
-                    results.push_back(alias);
+            auto it = idToAliases.find(id);
+            if (it == idToAliases.end()) continue;
+
+            for (auto& alias : it->second) {
+                if (results.size() >= limit) break;
+                results.push_back(alias);
             }
         }
     }

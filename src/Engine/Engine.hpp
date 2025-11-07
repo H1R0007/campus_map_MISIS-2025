@@ -1,5 +1,6 @@
 #pragma once
 #include <SDL2/SDL.h>
+#include <memory>
 
 class MapViewer;  // forward-declared to reduce coupling
 
@@ -15,11 +16,18 @@ public:
     void handleFrame();      // wasm loop (called each frame)
     void stop() { isRunning = false; }
 
+    MapViewer& getMapViewer() { return *mapViewer; }
+
 private:
-    SDL_Window* window;
-    SDL_Renderer* renderer;
+    std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)> window;
+    std::unique_ptr<SDL_Renderer, decltype(&SDL_DestroyRenderer)> renderer;
+    std::unique_ptr<MapViewer> mapViewer;
+
     bool isRunning;
-    MapViewer* mapViewer;
+
+    // ѕол€ дл€ хранени€ текущего состо€ни€ окна
+    int currentWidth;
+    int currentHeight;
 
     // input-processing + frame rendering
     void handleEvents();
