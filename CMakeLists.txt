@@ -7,6 +7,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_executable(campus_map
     src/main.cpp
+    src/bridge/ReactBridge.cpp
+    src/bridge/ReactBridge.hpp
     src/Map_Visuality/Map_Viewer.cpp
     src/Engine/Engine.cpp
     src/Camera/Camera.cpp
@@ -25,13 +27,18 @@ endif()
 
 if (EMSCRIPTEN)
   message(STATUS "Target: Web (Emscripten)")
-  set(CMAKE_EXECUTABLE_SUFFIX ".html")
-  set_target_properties(campus_map PROPERTIES OUTPUT_NAME "index")
+  set(CMAKE_EXECUTABLE_SUFFIX ".js")
+  set_target_properties(campus_map PROPERTIES OUTPUT_NAME "campus_map")
 
   set(EM_FLAGS
-      "-sUSE_SDL=2"
-      "-sALLOW_MEMORY_GROWTH=1"
-  )
+    "-sMODULARIZE=1"
+    "-sEXPORT_ES6=1" 
+    "-sEXPORT_NAME='CampusMap'"
+    "-sSINGLE_FILE=1"
+    "--bind"
+    "-sENVIRONMENT=web"
+    "-sINVOKE_RUN=0"
+)
   if (USE_SDL_IMAGE)
     list(APPEND EM_FLAGS "-sUSE_SDL_IMAGE=2" "-sSDL2_IMAGE_FORMATS=['png']")
   endif()
@@ -44,8 +51,8 @@ if (EMSCRIPTEN)
   if (EXISTS "${CMAKE_SOURCE_DIR}/assets")
 
     target_link_options(campus_map PRIVATE
-    "--shell-file=${CMAKE_SOURCE_DIR}/web_shell.html"
-    "--preload-file=${CMAKE_SOURCE_DIR}/assets@/assets"
+      "--shell-file=${CMAKE_SOURCE_DIR}/web_shell.html"
+      "--preload-file=${CMAKE_SOURCE_DIR}/assets@/assets"
     )
   endif()
   target_compile_options(campus_map PRIVATE ${EM_FLAGS})
