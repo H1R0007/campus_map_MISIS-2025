@@ -2,7 +2,7 @@
 #include <iostream>
 #include <SDL.h>
 #include "Engine/Engine.hpp"
-#include "bridge/ReactBridge.hpp"  // Добавьте этот include
+#include "bridge/SimpleBridge.hpp"  // Добавьте этот include
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
