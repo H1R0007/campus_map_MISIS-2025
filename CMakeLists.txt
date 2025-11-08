@@ -7,8 +7,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_executable(campus_map
     src/main.cpp
-    src/bridge/ReactBridge.cpp
-    src/bridge/ReactBridge.hpp
+    src/bridge/SimpleBridge.cpp
+    src/bridge/SimpleBridge.hpp
     src/Map_Visuality/Map_Viewer.cpp
     src/Engine/Engine.cpp
     src/Camera/Camera.cpp
