@@ -23,7 +23,7 @@ namespace ImGui {
         }
         return 0;
     }
-    bool InputTextWithHint(const char* label, const char* hint,
+    static bool InputTextWithHint(const char* label, const char* hint,
         std::string* str, ImGuiInputTextFlags flags = 0) {
         flags |= ImGuiInputTextFlags_CallbackResize;
         return ImGui::InputTextWithHint(
@@ -104,7 +104,7 @@ void UIManager::drawSearchWindow(MapViewer& mapViewer) {
     ImGui::SetNextWindowSize(ImVec2(routeW, routeH), ImGuiCond_Always);
     ImGui::SetNextWindowBgAlpha(CARD_ALPHA);
 
-    if (ImGui::Begin("🧭 Route Planner", nullptr,
+    if (ImGui::Begin("\uf14e Route Planner", nullptr,
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoCollapse |
         ImGuiWindowFlags_NoTitleBar))
@@ -373,7 +373,7 @@ void UIManager::drawSearchWindow(MapViewer& mapViewer) {
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, hoverColor);
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, activeColor);
 
-        if (ImGui::Button("🚀  Построить путь", ImVec2(btnWidth, BUTTON_HEIGHT)))
+        if (ImGui::Button("\uf4d7 Построить путь", ImVec2(btnWidth, BUTTON_HEIGHT)))
             mapViewer.buildPathFromAliases(fromStr, toStr);
 
         ImVec2 bPos = ImGui::GetItemRectMin();
@@ -393,7 +393,7 @@ void UIManager::drawSearchWindow(MapViewer& mapViewer) {
 
 // === Info & Options ===
 void UIManager::drawDevInfoWindow(MapViewer& mapViewer) {
-    if (!ImGui::Begin("ℹ️  Info & Options", nullptr,
+    if (!ImGui::Begin("\uf129  Info & Options", nullptr,
         ImGuiWindowFlags_NoMove |
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoCollapse |
@@ -456,7 +456,7 @@ void UIManager::drawTopNavBar(MapViewer& viewer) {
     ImGui::SetNextWindowSize(ImVec2(screenW, HEADER_H), ImGuiCond_Always);
 
     // ==== Начало окна-шапки ====
-    if (ImGui::Begin("🧭 TopNavigation", nullptr,
+    if (ImGui::Begin("\u1f9ed TopNavigation", nullptr,
         ImGuiWindowFlags_NoMove |
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoCollapse |
@@ -476,19 +476,24 @@ void UIManager::drawTopNavBar(MapViewer& viewer) {
             top, top, bottom, bottom
         );
 
-        // лёгкая полоса блика сверху
-        ImU32 shine = ImGui::GetColorU32(ImVec4(1, 1, 1, 0.06f));
-        draw->AddRectFilled(ImVec2(pos.x, pos.y),
-            ImVec2(pos.x + size.x, pos.y + 2.0f), shine);
+        // === Логотип MISIS ===
+        ImGui::SetCursorPos(ImVec2(LOGO_MARGIN_X, -10.0f));
+        if (logoTexture)
+        {
+            int texW = 0, texH = 0;
+            SDL_QueryTexture(logoTexture, nullptr, nullptr, &texW, &texH);
 
-        // === Логотип ===
-        ImGui::SetCursorPos(ImVec2(LOGO_MARGIN_X, LOGO_MARGIN_Y));
-        ImGui::PushFont(ImGui::GetFont());
-        ImGui::TextColored(
-            ImVec4(1.0f, 1.0f, 1.0f, 1.0f),
-            "🏫  MISIS Campus Map 2025"
-        );
-        ImGui::PopFont();
+            // Подгоним логотип в разумные пределы, чтобы точно был видим
+            float maxLogoH = 80.0f;        // высота примерно под шапку
+            float scale = maxLogoH / texH; // масштаб по высоте
+            ImVec2 logoSize(texW * scale, texH * scale);
+
+            ImGui::Image((ImTextureID)logoTexture, logoSize);
+        }
+        else
+        {
+            ImGui::TextColored(ImVec4(1, 1, 1, 1), "MISIS Campus Map 2025");
+        }
 
         // === Глобальный поиск ===
         float searchX = SIDEBAR_WIDTH + ITEM_SPACING * 2;
@@ -504,7 +509,7 @@ void UIManager::drawTopNavBar(MapViewer& viewer) {
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.1f, 0.12f, 0.18f, 1));
 
         ImGui::InputTextWithHint("##GlobalSearch",
-            "🔍 Найдите аудиторию, лабораторию или корпус...",
+            "\uf03a Найдите аудиторию, лабораторию или корпус...",
             &globalSearchQuery);
 
         ImGui::PopStyleColor(2);
@@ -515,10 +520,15 @@ void UIManager::drawTopNavBar(MapViewer& viewer) {
         // 🔘 Справа — блок контрастных белых кнопок
         //--------------------------------------------------
         float btnY = (HEADER_H - BTN_HEIGHT) * 0.5f;
-        float btnX = screenW - RIGHTBAR_WIDTH - 280.0f; // немного сдвигаем левее, т.к. кнопки длиннее
 
-        if (btnX < screenW * 0.55f) btnX = screenW * 0.55f;
-        ImGui::SetCursorPos(ImVec2(btnX, btnY));
+        // Правая кнопка (Полный экран)
+        float btnRightMargin = 20.0f;         // отступ от правого края окна
+        float fullBtnWidth = 150.0f;        // ширина кнопки "В полный экран"
+        float langBtnWidth = 110.0f;        // ширина кнопки "Рус / Eng"
+        float btnGap = 10.0f;         // зазор между кнопками
+
+        float fullBtnX = screenW - fullBtnWidth - btnRightMargin;
+        float langBtnX = fullBtnX - langBtnWidth - btnGap;
 
         // общие стили белых кнопок
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
@@ -528,10 +538,9 @@ void UIManager::drawTopNavBar(MapViewer& viewer) {
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.90f, 0.93f, 0.98f, 1.0f)); // мягкое нажатие
         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.65f, 0.70f, 0.85f, 1.0f)); // серо‑голубая рамка
 
-        // --- кнопка языка ---
-        if (ImGui::Button("🌐  Рус / Eng", ImVec2(120, BTN_HEIGHT))) {
-            std::cout << "[UI] Language toggle clicked\n";
-        }
+        // --- Кнопка языка ---
+        ImGui::SetCursorPos(ImVec2(langBtnX, btnY));
+        ImGui::Button("\u80ac  Рус / Eng", ImVec2(langBtnWidth, BTN_HEIGHT));
         ImGui::PopStyleColor(4);
         ImGui::SameLine();
 
@@ -541,7 +550,8 @@ void UIManager::drawTopNavBar(MapViewer& viewer) {
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.90f, 0.93f, 0.98f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.65f, 0.70f, 0.85f, 1.0f));
 
-        if (ImGui::Button("⛶  В полный экран", ImVec2(160, BTN_HEIGHT))) {
+        ImGui::SetCursorPos(ImVec2(fullBtnX, btnY));
+        if (ImGui::Button("\u26f6  В полный экран", ImVec2(fullBtnWidth, BTN_HEIGHT))) {
             SDL_Window* win = SDL_GL_GetCurrentWindow();
             Uint32 flags = SDL_GetWindowFlags(win);
             bool isFull = (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) != 0;
@@ -596,7 +606,7 @@ void UIManager::drawLeftSidebar(MapViewer& viewer) {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.92f, 0.94f, 0.98f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.85f, 0.90f, 0.98f, 1.0f));
-        if (ImGui::Button(collapsed ? "☰" : "☰  Меню", ImVec2(-1, 40)))
+        if (ImGui::Button(collapsed ? "\u2630" : "\u2630  Меню", ImVec2(-1, 40)))
             collapsed = !collapsed;
         ImGui::PopStyleColor(2);
         ImGui::PopStyleVar();
@@ -606,12 +616,12 @@ void UIManager::drawLeftSidebar(MapViewer& viewer) {
 
         // --- Основные пункты навигации ---
         static const std::pair<const char*, const char*> items[] = {
-            { "🎓", "Университет" },
-            { "📘", "Библиотека" },
-            { "☕", "Кафе и столовые" },
-            { "🏋️", "Спортцентр" },
-            { "🧭", "Главная площадь" },
-            { "🏢", "Администрация" }
+            { "\uf015", "Университет"},
+            { "\uf518", "Библиотека"},
+            { "\uf0f4", "Кафе и столовые" },
+            { "\uf5a2", "Спортцентр" },
+            { "\uf568", "Главная площадь" },
+            { "\uf015", "Администрация" }
         };
 
         for (int i = 0; i < IM_ARRAYSIZE(items); i++) {
@@ -661,21 +671,7 @@ void UIManager::drawLeftSidebar(MapViewer& viewer) {
                 dl->AddText(ImVec2(btnPos.x + 16.0f + 28.0f, textY),
                     ImGui::GetColorU32(textCol), items[i].second);
             }
-
-            ImGui::SetCursorScreenPos(ImVec2(btnPos.x, btnPos.y + ITEM_HEIGHT + 8));
         }
-
-        // нижняя "системная" секция
-        ImGui::Dummy(ImVec2(0, 16));
-        ImGui::SeparatorText("Система");
-
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.05f, 0.45f, 0.95f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.10f, 0.55f, 1.0f, 1.0f));
-        if (ImGui::Button("💾  Сохранить изменения", ImVec2(-1, 36)))
-            std::cout << "[UI] Data save\n";
-        if (ImGui::Button("🔄  Перезагрузить карту", ImVec2(-1, 36)))
-            std::cout << "[UI] Reload requested\n";
-        ImGui::PopStyleColor(2);
     }
     ImGui::End();
 }
@@ -696,7 +692,7 @@ void UIManager::drawRightPanel(MapViewer& viewer) {
         float newWidth = panelWidth;
         ImGui::SetNextWindowPos(ImVec2(screenW - panelWidth, HEADER_HEIGHT));
         ImGui::SetNextWindowSize(ImVec2(panelWidth, screenH - HEADER_HEIGHT));
-        if (ImGui::Begin("🧩 Right Panel (Dev)", nullptr,
+        if (ImGui::Begin("\uf12e Right Panel (Dev)", nullptr,
             ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoCollapse |
             ImGuiWindowFlags_NoResize |
@@ -868,7 +864,7 @@ void UIManager::drawFloorBuildingPanel(MapViewer& mapViewer) {
         // КНОПКА ГЛАВНОГО ВИДА (КАМПУС)
         //---------------------------------------------
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-        if (ImGui::Button("🗺  Вид сверху (Кампус)", ImVec2(-1, BUTTON_H))) {
+        if (ImGui::Button("\uf279  Вид сверху (Кампус)", ImVec2(-1, BUTTON_H))) {
             mapViewer.switchViewToCampus();
         }
 
@@ -944,48 +940,3 @@ void UIManager::drawFloorBuildingPanel(MapViewer& mapViewer) {
     }
     ImGui::End();
 }
-
-/*void UIManager::drawTransitionEffect(MapViewer& mapViewer) {
-
-    const float TOTAL_DUR = 0.6f;
-    float progress = mapViewer.getTransitionProgress();
-    const float midpoint = 0.3f; // половина — момент смены карты
-
-    // вычисляем альфу: сначала затухание, затем проявление
-    float alpha =
-        (progress < midpoint)
-        ? (progress / midpoint)
-        : (1.0f - ((progress - midpoint) / (TOTAL_DUR - midpoint)));
-    alpha = std::clamp(alpha, 0.0f, 1.0f);
-
-    if (!mapViewer.isTransitionActive())
-        std::cout << "[Transition] progress=" << progress
-        << " alpha=" << alpha
-        << " path=" << mapViewer.getTargetMapPath() << std::endl;
-    return;
-
-    SDL_Renderer* r = mapViewer.getGraphManager()
-        .getActiveNodesMutable()
-        .empty() ? nullptr
-        : nullptr; // просто для наглядности
-
-    SDL_Renderer* renderer = nullptr;
-    renderer = mapViewer.getRenderer();
-
-    if (!renderer) return;
-
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, static_cast<Uint8>(alpha * 255));
-    SDL_Rect full = { 0, 0, Config::CANVAS_WIDTH, Config::CANVAS_HEIGHT };
-    SDL_RenderFillRect(renderer, &full);
-
-    // на середине — меняем карту
-    if (progress >= midpoint && mapViewer.getTargetMapPath() != "") {
-        mapViewer.loadTargetMap();
-    }
-
-    // по завершении
-    if (progress >= 1.0f) {
-        mapViewer.completeTransition();
-    }
-}*/

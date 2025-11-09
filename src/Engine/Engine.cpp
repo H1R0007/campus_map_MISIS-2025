@@ -4,6 +4,7 @@
 #include "../UI/UIManager.hpp"
 #include "../UI/UITheme.hpp"
 #include <SDL2/SDL_ttf.h>
+#include <SDL2/SDL_image.h>
 #include <iostream>
 
 #include "imgui.h"
@@ -29,6 +30,10 @@ Engine::Engine(const char* title, int w, int h)
         throw std::runtime_error("TTF Init failed");
     }
 
+    if (!(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG)) {
+        std::cerr << "IMG_Init failed: " << IMG_GetError() << std::endl;
+    }
+
     SDL_StartTextInput();
 
     // Используем .reset() для присваивания значения
@@ -50,10 +55,6 @@ Engine::Engine(const char* title, int w, int h)
     }
 
     initImGui();
-
-    // `std::make_unique` - безопасный способ создания
-    mapViewer = std::make_unique<MapViewer>(renderer.get());
-    uiManager = std::make_unique<UIManager>();
 }
 
 Engine::~Engine() {
@@ -68,7 +69,24 @@ void Engine::initImGui() {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
-    io.Fonts->AddFontFromFileTTF("assets/fonts/Roboto-Regular.ttf", 18.0f);
+    io.Fonts->AddFontFromFileTTF("assets/UI/fonts/Roboto-Regular.ttf", 18.0f);
+
+    ImFontConfig cfg;
+    cfg.MergeMode = true;
+    cfg.PixelSnapH = true;
+    static const ImWchar emoji_range[] = { 0x2600, 0x27BF, 0 };
+    io.Fonts->AddFontFromFileTTF("assets/UI/fonts/NotoEmoji-Regular.ttf", 18.0f, &cfg, emoji_range);
+
+    cfg.MergeMode = true;
+    static const ImWchar fa_range[] = { 0xf000, 0xf3ff, 0 };
+    io.Fonts->AddFontFromFileTTF("assets/UI/fonts/fa-solid-900.ttf", 16.0f, &cfg, fa_range);
+
+    if (io.Fonts->Fonts.empty())
+        std::cerr << "[ImGui] Font atlas failed to load!" << std::endl;
+    else
+        std::cout << "[ImGui] Font atlas built, total "
+        << io.Fonts->Fonts.size() << " fonts merged.\n";
+
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
@@ -79,6 +97,43 @@ void Engine::initImGui() {
 
     ImGui_ImplSDL2_InitForSDLRenderer(window.get(), renderer.get());
     ImGui_ImplSDLRenderer2_Init(renderer.get());
+
+    uiManager = std::make_unique<UIManager>();
+    mapViewer = std::make_unique<MapViewer>(renderer.get());
+
+    // === Загружаем логотип MISIS ===
+    SDL_Surface* surface = IMG_Load("assets/UI/icons/MISIS_logo.png");
+    std::cout << "\n[UI] === Logo load sequence ===\n";
+    std::cout << "[UI] IMG_Load path = assets/UI/icons/MISIS_logo.png\n";
+
+    if (!surface) {
+        std::cerr << "[UI] Failed to load PNG: " << IMG_GetError() << std::endl;
+    }
+    else {
+        std::cout << "[UI] Surface loaded successfully.\n"
+            << "      w=" << surface->w << " h=" << surface->h
+            << " pitch=" << surface->pitch << std::endl;
+
+        SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer.get(), surface);
+        if (!tex) {
+            std::cerr << "[UI] SDL_CreateTextureFromSurface failed: "
+                << SDL_GetError() << std::endl;
+        }
+        else {
+            std::cout << "[UI] Texture created OK: " << tex << std::endl;
+        }
+
+        SDL_FreeSurface(surface);
+
+        if (uiManager) {
+            uiManager->setLogoTexture(tex);
+            std::cout << "[UI] Texture pointer passed to UIManager.\n";
+        }
+        else {
+            std::cerr << "[UI] uiManager pointer is NULL!\n";
+        }
+    }
+    std::cout << "[UI] ==========================\n";
 }
 
 void Engine::shutdownImGui() {
@@ -169,15 +224,15 @@ void Engine::render() {
         return;
     }
 
+    SDL_SetRenderDrawColor(renderer.get(), 235, 238, 243, 255);
+    SDL_RenderClear(renderer.get());
+    mapViewer->render();
+
     // --- Обычный UI ---
     if (uiManager) {
         mapViewer->updateSuggestions();
         uiManager->render(*mapViewer);
     }
-
-    SDL_SetRenderDrawColor(renderer.get(), 235, 238, 243, 255);
-    SDL_RenderClear(renderer.get());
-    mapViewer->render();
 
     ImGui::Render();
     ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer.get());

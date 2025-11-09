@@ -43,6 +43,31 @@ void MapViewer::handleEvent(SDL_Event& event) {
 
 // === Rendering ===
 void MapViewer::render() {
+
+    SDL_Renderer* r = mapRenderer->getRenderer();
+
+    // Цвет фона
+    SDL_SetRenderDrawColor(r, 10, 15, 25, 255); // тёмно‑синий фон
+    SDL_RenderClear(r);
+
+    // Параметры сетки
+    const int gridStep = 100;             // шаг сетки в пикселях
+    const SDL_Color gridColor = { 0, 174, 255, 15 }; // rgb с альфой ≈0.06
+    int w = Config::CANVAS_WIDTH;
+    int h = Config::CANVAS_HEIGHT;
+
+    // Включаем полупрозрачное рисование
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(r, gridColor.r, gridColor.g, gridColor.b, gridColor.a);
+
+    // Вертикальные линии
+    for (int x = 0; x < w; x += gridStep)
+        SDL_RenderDrawLine(r, x, 0, x, h);
+
+    // Горизонтальные линии
+    for (int y = 0; y < h; y += gridStep)
+        SDL_RenderDrawLine(r, 0, y, w, y);
+
     std::string viewStr = (currentView == ViewMode::Campus) ? "campus" : "floor";
     mapRenderer->renderScene(
         camera,
@@ -104,18 +129,14 @@ void MapViewer::switchToFloor(const std::string& buildingId, int floor) {
 
     for (const auto& f : bm->floors) {
         if (f.floor == floor) {
-            // начинаем плавный переход
-            transitionActive = true;
-            transitionStart = SDL_GetTicks();
-            transitionAlpha = 0.0f;
-            targetMapPath = "assets/buildings/" + bm->id + "/" + f.mapPath;
             currentView = ViewMode::BuildingFloor;
             currentBuilding = buildingId;
             currentFloor = f.floor;
 
-            graphManager.setActiveGraph(buildingId + "_floor_" + std::to_string(floor));
+            graphManager.setActiveGraph(buildingId + "_floor_" + std::to_string(f.floor));
+            loadMap("assets/buildings/" + bm->id + "/" + f.mapPath);
 
-            std::cout << "Starting fade transition to " << bm->name << " floor " << floor << "\n";
+            std::cout << "Switched to " << bm->name << " floor " << floor << "\n";
             return;
         }
     }
@@ -127,14 +148,8 @@ void MapViewer::switchViewToCampus() {
     currentBuilding.clear();
     currentFloor = 0;
     graphManager.setActiveGraph("__campus");
-
-    // запускаем переход
-    transitionActive = true;
-    transitionStart = SDL_GetTicks();
-    transitionAlpha = 0.0f;
-    targetMapPath = Config::CAMPUS_MAP_PATH;
-
-    std::cout << "Starting fade transition to CAMPUS view\n";
+    loadMap(Config::CAMPUS_MAP_PATH);
+    std::cout << "Switched to CAMPUS view\n";
 }
 
 // === Private Helpers ===
@@ -190,7 +205,3 @@ void MapViewer::updateSuggestions() {
         currentSuggestions = aliasManager.suggest(currentInput, 3);
     }
 }
-
-/*SDL_Renderer* MapViewer::getRenderer() {
-    return mapRenderer->getRenderer();
-}*/

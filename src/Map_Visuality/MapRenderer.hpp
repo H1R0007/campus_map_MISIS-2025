@@ -42,6 +42,7 @@ public:
 
     // Хелпер для получения размеров отрисованного текста (нужен для InputHandler)
     SDL_Rect getTextSize(const std::string& text);
+    SDL_Renderer* getRenderer() const { return renderer; }
 
 private:
     SDL_Renderer* renderer;
