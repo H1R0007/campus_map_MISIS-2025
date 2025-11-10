@@ -52,12 +52,6 @@ void UIManager::render(MapViewer& viewer) {
     ImGui::SetNextWindowSize(ImVec2(screenW, headerH));
     drawTopNavBar(viewer);
 
-    // --- Левая панель (адаптивная по высоте) ---
-    float sidebarH = screenH - headerH;
-    ImGui::SetNextWindowPos(ImVec2(0, headerH));
-    ImGui::SetNextWindowSize(ImVec2(sidebarW, sidebarH));
-    drawLeftSidebar(viewer);
-
     // --- Окно маршрута: адаптивный отступ и центрирование относительно Sidebar ---
     float routeX = sidebarW + margin;
     float routeY = headerH + margin * 1.2f;
@@ -69,6 +63,10 @@ void UIManager::render(MapViewer& viewer) {
     drawSearchWindow(viewer);
 
     drawFloorBuildingPanel(viewer);
+
+    drawPlaceSearchWindow(viewer);
+
+    drawBottomMenuBar(viewer);
 
    //  drawTransitionEffect(viewer);
 #ifndef __EMSCRIPTEN__
@@ -86,307 +84,294 @@ void UIManager::render(MapViewer& viewer) {
 }
 
 void UIManager::drawSearchWindow(MapViewer& mapViewer) {
-    constexpr float FIELD_HEIGHT = 34.0f;
-    constexpr float CARD_ALPHA = 0.97f;
-    constexpr float CORNER_RAD = 12.0f;
-    constexpr float EDGE_GLOW_STRENGTH = 0.25f;
+    ImGuiIO& io = ImGui::GetIO();
+    float screenW = io.DisplaySize.x;
 
-    // Позиция и размеры окна теперь аккуратнее по ширине, выше по высоте
-    float screenW = ImGui::GetIO().DisplaySize.x;
-    float screenH = ImGui::GetIO().DisplaySize.y;
+    // --- геометрия окна ---
+    const float WIDTH = 360.0f;
+    const float HEIGHT = 230.0f;      // ↑ увеличено по Oy на ~10 %
+    const float TOP = 20.0f;
+    const float LEFT = 20.0f;
+    const float RADIUS = 12.0f;
 
-    float routeW = std::clamp(400.0f * (screenW / 1920.0f), 360.0f, 440.0f);
-    float routeH = std::clamp(260.0f * (screenH / 1080.0f), 230.0f, 320.0f);
-    float topOffset = Layout::HEADER_HEIGHT + 6.0f;
-    float rightMargin = 20.0f;
+    ImGui::SetNextWindowPos(ImVec2(LEFT, TOP));
+    ImGui::SetNextWindowSize(ImVec2(WIDTH, HEIGHT));
+    ImGui::SetNextWindowBgAlpha(0.97f);
 
-    ImGui::SetNextWindowPos(ImVec2(screenW - routeW - rightMargin, topOffset), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(routeW, routeH), ImGuiCond_Always);
-    ImGui::SetNextWindowBgAlpha(CARD_ALPHA);
-
-    if (ImGui::Begin("\uf14e Route Planner", nullptr,
-        ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoCollapse |
-        ImGuiWindowFlags_NoTitleBar))
+    if (ImGui::Begin("RoutePlannerCompact", nullptr,
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
     {
-        //------------------------------------------------------------------
-        // 🔲 Подложка панели: более плавное и медленное "дыхание"
-        //------------------------------------------------------------------
         ImDrawList* dl = ImGui::GetWindowDrawList();
         ImVec2 pos = ImGui::GetWindowPos();
         ImVec2 size = ImGui::GetWindowSize();
 
-        float t = SDL_GetTicks() * 0.0005f;           // медленнее в 4 раза
-        float osc = 0.5f + 0.5f * sinf(t * 1.1f);     // мягкое дыхание
-
-        ImVec4 topColor = ImVec4(1.0f, 1.0f, 1.0f, 0.96f);
-        ImVec4 bottomColor = ImVec4(0.82f + 0.10f * osc,
-            0.88f + 0.07f * osc,
-            1.0f,
-            1.0f);
-        ImU32 cTop = ImGui::GetColorU32(topColor);
-        ImU32 cBottom = ImGui::GetColorU32(bottomColor);
-
-        dl->AddRectFilledMultiColor(pos, ImVec2(pos.x + size.x, pos.y + size.y),
-            cTop, cTop, cBottom, cBottom);
-
+        // матовый фон + граница
+        ImVec4 bg = ImVec4(1.0f, 1.0f, 1.0f, 0.96f);
+        ImVec4 border = ImVec4(0.82f, 0.84f, 0.85f, 1.0f);
+        dl->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y),
+            ImGui::GetColorU32(bg), RADIUS);
         dl->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y),
-            ImGui::GetColorU32(ImVec4(0, 0, 0, 0.10f)), CORNER_RAD, 0, 2.0f);
-        //------------------------------------------------------------------
-        // ✨ Glowing Edges — свечение только по краям при наведении курсора
-        //------------------------------------------------------------------
+            ImGui::GetColorU32(border), RADIUS, 0, 1.2f);
 
-        ImVec2 mousePos = ImGui::GetIO().MousePos;
-        bool hovered = (mousePos.x >= pos.x && mousePos.x <= pos.x + size.x &&
-            mousePos.y >= pos.y && mousePos.y <= pos.y + size.y);
+        ImGui::SetCursorPos(ImVec2(16, 14));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.05f, 0.25f, 0.65f, 1.0f));
+        ImGui::TextUnformatted(u8"\uf14e  Построение маршрута");
+        ImGui::PopStyleColor();
 
-        if (hovered) {
-            // --- 1. Временной коэффициент для анимации
-            float time = SDL_GetTicks() * 0.0015f; // 1.5 цикла в секунду
+        ImGui::Dummy(ImVec2(0, 8));
 
-            // --- 2. Определяем динамику пульса и волны
-            float pulse = 0.5f + 0.5f * sinf(time * 2.5f);
-            float wave = sinf(time * 3.5f) * 0.15f;
-
-            // --- 3. Глобальный цветовой сдвиг между голубым и лазурным
-            ImVec4 baseCol = ImVec4(0.05f + wave, 0.45f + pulse * 0.25f, 1.0f, 1.0f);
-            ImVec4 outerGlow = ImVec4(baseCol.x, baseCol.y, baseCol.z, 0.55f + pulse * 0.25f);
-            ImVec4 midGlow = ImVec4(baseCol.x, baseCol.y, baseCol.z, 0.35f + pulse * 0.20f);
-            ImVec4 innerGlow = ImVec4(baseCol.x, baseCol.y, baseCol.z, 0.18f + pulse * 0.12f);
-
-            // --- 4. Конфигурация уровней свечения
-            const int layers = 6;
-            const float spacing = 1.8f; // расстояние между слоями
-
-            // --- 5. Отрисовываем концентрические рамки (наружу ярче и немного шире)
-            for (int i = 0; i < layers; ++i) {
-                float expand = i * spacing;
-                ImVec4 colStep;
-                float alphaStep = 1.0f - (i / float(layers));
-
-                // переключаем плавно от яркого к мягкому оттенку
-                if (i < 2)       colStep = outerGlow;
-                else if (i < 4)  colStep = midGlow;
-                else              colStep = innerGlow;
-
-                colStep.w *= alphaStep;
-                dl->AddRect(ImVec2(pos.x - expand, pos.y - expand),
-                    ImVec2(pos.x + size.x + expand, pos.y + size.y + expand),
-                    ImGui::GetColorU32(colStep),
-                    CORNER_RAD + expand,
-                    0,
-                    3.0f);
-            }
-
-            // --- 6. Добавляем рассеянное внутреннее свечение по углам (не резкий отблеск)
-            ImU32 cornerColor = ImGui::GetColorU32(ImVec4(baseCol.x, baseCol.y, baseCol.z, 0.25f + pulse * 0.25f));
-
-            // верхний и нижний края лёгким градиентом в стороны
-            for (int i = 0; i < 5; ++i) {
-                float fade = (1.0f - i / 5.0f) * (0.5f + pulse * 0.5f);
-                float offset = 3.0f + i * 1.5f;
-                ImU32 c = ImGui::GetColorU32(ImVec4(baseCol.x, baseCol.y, baseCol.z, 0.15f * fade));
-                // верх
-                dl->AddLine(ImVec2(pos.x + offset, pos.y - offset),
-                    ImVec2(pos.x + size.x - offset, pos.y - offset), c, 2.0f + i * 0.5f);
-                // низ
-                dl->AddLine(ImVec2(pos.x + offset, pos.y + size.y + offset),
-                    ImVec2(pos.x + size.x - offset, pos.y + size.y + offset), c, 2.0f + i * 0.5f);
-                // лево
-                dl->AddLine(ImVec2(pos.x - offset, pos.y + offset),
-                    ImVec2(pos.x - offset, pos.y + size.y - offset), c, 2.0f + i * 0.5f);
-                // право
-                dl->AddLine(ImVec2(pos.x + size.x + offset, pos.y + offset),
-                    ImVec2(pos.x + size.x + offset, pos.y + size.y - offset), c, 2.0f + i * 0.5f);
-            }
-
-            // --- 7. Эффект "движущейся волны" по периметру (немного света, едет по кругу)
-            const int segs = 60;
-            float perimeter = 2.0f * (size.x + size.y);
-            float offsetAnim = fmodf(time * 120.0f, perimeter);
-
-            ImVec4 waveColor = ImVec4(0.20f * pulse, 0.55f + 0.3f * pulse, 1.0f, 0.8f);
-            float lengthAnim = 120.0f + 60.0f * pulse;
-
-            // создаем 4 сегмента по сторонам
-            auto drawMovingEdge = [&](ImVec2 a, ImVec2 b, float length, float offset, ImVec4 color) {
-                ImVec2 dir = { b.x - a.x, b.y - a.y };
-                float len = sqrtf(dir.x * dir.x + dir.y * dir.y);
-                if (len < 1.0f) return;
-                dir.x /= len; dir.y /= len;
-
-                float start = fmodf(offset, len);
-                float end = start + length;
-                if (end > len) end = len;
-
-                ImVec2 p1 = { a.x + dir.x * start, a.y + dir.y * start };
-                ImVec2 p2 = { a.x + dir.x * end,   a.y + dir.y * end };
-                dl->AddLine(p1, p2, ImGui::GetColorU32(color), 4.0f);
-                };
-
-            float perimeterLength = (size.x + size.y) * 2;
-            float animOffset = fmodf(time * 250.0f, perimeterLength);
-
-            // четыре стороны – двигающаяся волна цвета
-            drawMovingEdge(ImVec2(pos.x, pos.y),
-                ImVec2(pos.x + size.x, pos.y),
-                lengthAnim, animOffset, waveColor);
-            drawMovingEdge(ImVec2(pos.x + size.x, pos.y),
-                ImVec2(pos.x + size.x, pos.y + size.y),
-                lengthAnim, animOffset - size.x, waveColor);
-            drawMovingEdge(ImVec2(pos.x + size.x, pos.y + size.y),
-                ImVec2(pos.x, pos.y + size.y),
-                lengthAnim, animOffset - (size.x + size.y), waveColor);
-            drawMovingEdge(ImVec2(pos.x, pos.y + size.y),
-                ImVec2(pos.x, pos.y),
-                lengthAnim, animOffset - (2 * size.x + size.y), waveColor);
-        }
-        //------------------------------------------------------------------
-        // 🪄 Заголовок
-        //------------------------------------------------------------------
-        ImGui::PushItemWidth(-1);
-        ImGui::TextColored(ImVec4(0.0f, 0.25f, 0.65f, 1.0f), "Построение маршрута");
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        //------------------------------------------------------------------
-        // ✍️ Поля ввода — аккуратные, без подсветки, с ясной активной заливкой
-        //------------------------------------------------------------------
+        //-------------------------------------------------------
+// поля ввода "Откуда" и "Куда"
+//-------------------------------------------------------
         std::string& fromStr = mapViewer.getInputFrom();
         std::string& toStr = mapViewer.getInputTo();
-        const char* hints[2] = { "Откуда...", "Куда..." };
-        std::string* strs[2] = { &fromStr, &toStr };
+        ImGui::PushItemWidth(-1);
 
-        ImGui::PushItemWidth(-1.0f);
+        // --- поле ОТКУДА ---
+        ImVec2 fromMin, fromMax;
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.96f, 0.98f, 1.0f, 0.55f));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.15f, 0.16f, 0.22f, 1.0f));
+        if (ImGui::InputTextWithHint("##fromRoute", "Откуда...", &fromStr)) {
+            mapViewer.setEditingFrom(true);    // запоминаем, что активно первое поле
+            mapViewer.updateSuggestions();
+        }
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar();
+        fromMin = ImGui::GetItemRectMin();
+        fromMax = ImGui::GetItemRectMax();
+        if (ImGui::IsItemActive())
+            dl->AddRect(fromMin, fromMax, ImGui::GetColorU32(ImVec4(0.00f, 0.45f, 0.95f, 1.0f)),
+                6.0f, 0, 2.0f);
 
-        for (int i = 0; i < 2; ++i)
-        {
-            // --- ввод ---
-            bool isFrom = (i == 0);
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
-            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(1, 1, 1, 1));
-            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.7f, 0.72f, 0.78f, 0.6f));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.15f, 0.16f, 0.20f, 1.0f));
+        ImGui::Dummy(ImVec2(0, 8));
 
-            bool edited = ImGui::InputTextWithHint(isFrom ? "##from" : "##to",
-                hints[i], strs[i],
-                ImGuiInputTextFlags_EnterReturnsTrue);
+        // --- поле КУДА ---
+        ImVec2 toMin, toMax;
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.96f, 0.98f, 1.0f, 0.55f));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.15f, 0.16f, 0.22f, 1.0f));
+        if (ImGui::InputTextWithHint("##toRoute", "Куда...", &toStr)) {
+            mapViewer.setEditingFrom(false);   // активное теперь второе поле
+            mapViewer.updateSuggestions();
+        }
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar();
+        toMin = ImGui::GetItemRectMin();
+        toMax = ImGui::GetItemRectMax();
+        if (ImGui::IsItemActive())
+            dl->AddRect(toMin, toMax, ImGui::GetColorU32(ImVec4(0.00f, 0.45f, 0.95f, 1.0f)),
+                6.0f, 0, 2.0f);
+        ImGui::PopItemWidth();
 
-            ImGui::PopStyleColor(3);
-            ImGui::PopStyleVar();
+        // кнопка -------------------------------------------------------------
+        ImGui::Dummy(ImVec2(0, 10));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.03f, 0.47f, 1.00f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.10f, 0.55f, 1.00f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.00f, 0.45f, 0.95f, 1.0f));
+        ImGui::SetCursorPosX((WIDTH - 230.0f) * 0.5f);
+        if (ImGui::Button("🚀  Построить маршрут", ImVec2(230.0f, 34.0f)))
+            mapViewer.buildPathFromAliases(fromStr, toStr);
+        ImGui::PopStyleColor(3);
+        ImGui::PopStyleVar();
 
-            // --- активация режима автодополнения ---
-            if (ImGui::IsItemActive()) {
-                autoState.active = true;
-                autoState.editingFrom = isFrom;
-                mapViewer.setEditingFrom(isFrom);
-                mapViewer.updateSuggestions();
-            }
-            if (edited) {
-                mapViewer.buildPathFromAliases(fromStr, toStr);
-            }
+        //-------------------------------------------------------
+        // отдельные popup‑подсказки (только для активного поля)
+        //-------------------------------------------------------
+        auto drawSuggestionsPopup = [&](const std::vector<std::string>& sugg,
+            const ImVec2& fieldMin,
+            const ImVec2& fieldMax,
+            bool forFrom,
+            std::string& fieldText)
+            {
+                if (sugg.empty()) return;
 
-            ImVec2 a = ImGui::GetItemRectMin();
-            ImVec2 b = ImGui::GetItemRectMax();
-            ImDrawList* dl = ImGui::GetWindowDrawList();
-            if (ImGui::IsItemActive())
-                dl->AddRect(a, b, ImGui::GetColorU32(ImVec4(0.0f, 0.45f, 0.95f, 1.0f)), 6.0f, 0, 2.0f);
+                // если введён текст полностью совпадает с одним из вариантов — скрываем список
+                for (const std::string& s : sugg)
+                    if (s == fieldText) return;
 
-            // === подсказки ===
-            if (autoState.active && autoState.editingFrom == isFrom) {
-                const auto& sugg = mapViewer.getCurrentSuggestions();
-                if (!sugg.empty()) {
-                    float itemH = 26.0f;
-                    float totalH = std::min(itemH * (float)sugg.size(), 130.0f);
-                    ImVec2 pos = ImVec2(a.x, b.y + 2.0f);
-                    ImVec2 size = ImVec2(b.x - a.x, totalH);
-                    ImGui::SetCursorScreenPos(pos);
+                const float popupW = 200.0f;
+                const float popupShiftX = 14.0f;
+                const float popupShiftY = forFrom ? 0.0f : 6.0f;
+                const float RADIUS = 8.0f;
+                std::string windowId = forFrom ? "##RouteSuggestionsFrom" : "##RouteSuggestionsTo";
 
-                    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 6.0f);
-                    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(1, 1, 1, 0.96f));
-                    ImGui::BeginChild(("AutoList" + std::to_string(i)).c_str(), size, true, ImGuiWindowFlags_NoScrollbar);
+                ImGui::SetNextWindowPos(ImVec2(fieldMax.x + popupShiftX, fieldMin.y + popupShiftY));
+                ImGui::SetNextWindowSize(ImVec2(popupW, 130.0f));
 
-                    // обработка стрелок ↑↓ и Enter
-                    if (ImGui::IsKeyPressed(ImGuiKey_UpArrow))
-                        autoState.hovered = (autoState.hovered <= 0) ? (int)sugg.size() - 1 : autoState.hovered - 1;
-                    if (ImGui::IsKeyPressed(ImGuiKey_DownArrow))
-                        autoState.hovered = (autoState.hovered + 1) % (int)sugg.size();
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, RADIUS);
+                ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(1.0f, 1.0f, 1.0f, 0.97f));
+                ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.82f, 0.84f, 0.85f, 1.0f));
 
-                    for (int j = 0; j < sugg.size(); ++j) {
-                        bool h = (j == autoState.hovered);
-                        ImVec4 color = h ? ImVec4(0.05f, 0.45f, 0.95f, 0.2f) : ImVec4(1, 1, 1, 0);
-                        if (h)
-                            dl->AddRectFilled(ImVec2(a.x + 2, pos.y + j * itemH),
-                                ImVec2(a.x + size.x - 2, pos.y + (j + 1) * itemH),
-                                ImGui::GetColorU32(color), 4.0f);
+                bool open = true;
+                ImGuiWindowFlags flags =
+                    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+                    ImGuiWindowFlags_NoScrollbar |
+                    ImGuiWindowFlags_NoFocusOnAppearing |
+                    ImGuiWindowFlags_NoBringToFrontOnFocus;
 
-                        if (ImGui::Selectable(sugg[j].c_str(), h)) {
-                            if (autoState.editingFrom) fromStr = sugg[j];
-                            else toStr = sugg[j];
-                            mapViewer.clearSuggestions();
-                            autoState.active = false;
-                            autoState.hovered = -1;
-                            ImGui::SetKeyboardFocusHere(-1);
-                            break;
+                if (ImGui::Begin(windowId.c_str(), &open, flags))
+                {
+                    // фон и рамка MISIS‑стиля
+                    ImDrawList* dl = ImGui::GetWindowDrawList();
+                    ImVec2 pos = ImGui::GetWindowPos();
+                    ImVec2 size = ImGui::GetWindowSize();
+                    dl->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y),
+                        ImGui::GetColorU32(ImVec4(1, 1, 1, 0.97f)), RADIUS);
+                    dl->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y),
+                        ImGui::GetColorU32(ImVec4(0.82f, 0.84f, 0.85f, 1)),
+                        RADIUS, 0, 1.2f);
+
+                    ImGui::Dummy(ImVec2(10, 6));
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.05f, 0.25f, 0.65f, 1.0f));
+                    ImGui::SetCursorPosX(12);
+                    ImGui::TextUnformatted(u8"\uf002  Подсказки");
+                    ImGui::PopStyleColor();
+                    ImGui::Dummy(ImVec2(0, 4));
+
+                    const float totalW = popupW - 20.0f;
+                    ImGui::PushItemWidth(totalW);
+
+                    for (size_t i = 0; i < sugg.size(); ++i) {
+                        std::string id = sugg[i] + "##" + std::to_string(i) + windowId;
+                        if (ImGui::Selectable(id.c_str(), false,
+                            ImGuiSelectableFlags_None,
+                            ImVec2(totalW, 26.0f)))
+                        {
+                            if (forFrom) {
+                                mapViewer.getInputFrom() = sugg[i];
+                                mapViewer.setEditingFrom(true);
+                            }
+                            else {
+                                mapViewer.getInputTo() = sugg[i];
+                                mapViewer.setEditingFrom(false);
+                            }
+                            open = false; // выбран вариант → закрываем
                         }
                     }
 
-                    // Enter выбирает подсвеченный элемент
-                    if (autoState.hovered >= 0 && ImGui::IsKeyPressed(ImGuiKey_Enter))
-                    {
-                        if (autoState.editingFrom) fromStr = sugg[autoState.hovered];
-                        else toStr = sugg[autoState.hovered];
-                        mapViewer.clearSuggestions();
-                        autoState.active = false;
-                        autoState.hovered = -1;
-                        ImGui::SetKeyboardFocusHere(-1);
-                    }
+                    ImGui::PopItemWidth();
 
-                    ImGui::EndChild();
-                    ImGui::PopStyleColor();
-                    ImGui::PopStyleVar();
+                    // закрываем при клике вне popup
+                    if (!ImGui::IsWindowFocused(ImGuiFocusedFlags_AnyWindow) &&
+                        ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+                        open = false;
                 }
-            }
-            ImGui::Spacing();
-        }
+                ImGui::End();
+
+                // при закрытии возвращаем фокус к полю
+                if (!open)
+                    ImGui::SetKeyboardFocusHere(-1);
+
+                ImGui::PopStyleColor(2);
+                ImGui::PopStyleVar();
+            };  //  ←‑‑‑ ЗАВЕРШЕНИЕ лямбды
+
+        //-------------------------------------------------------
+        // вызовы popup‑окон для активного поля
+        //-------------------------------------------------------
+        if (mapViewer.isEditingFrom())
+            drawSuggestionsPopup(mapViewer.getCurrentSuggestions(), fromMin, fromMax, true, fromStr);
+        else
+            drawSuggestionsPopup(mapViewer.getCurrentSuggestions(), toMin, toMax, false, toStr);
+
+        ImGui::End();
+    }
+}
+
+// === Окно "Поиск места" (верхний правый угол) ===
+void UIManager::drawPlaceSearchWindow(MapViewer& mapViewer) {
+    ImGuiIO& io = ImGui::GetIO();
+    float screenW = io.DisplaySize.x;
+
+    // Геометрия окна
+    constexpr float WIDTH = 320.0f;
+    constexpr float HEIGHT = 112.0f;   // −20% по Oy от 140
+    constexpr float RADIUS = 12.0f;
+    constexpr float TOP = 20.0f;
+    constexpr float RIGHT = 20.0f;
+
+    ImGui::SetNextWindowPos(ImVec2(screenW - WIDTH - RIGHT, TOP));
+    ImGui::SetNextWindowSize(ImVec2(WIDTH, HEIGHT));
+    ImGui::SetNextWindowBgAlpha(0.97f);
+
+    if (ImGui::Begin("FindPlaceCompact", nullptr,
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
+        ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoCollapse))
+    {
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        ImVec2 pos = ImGui::GetWindowPos();
+        ImVec2 size = ImGui::GetWindowSize();
+
+        // фон и рамка
+        ImVec4 bgCol = ImVec4(1.0f, 1.0f, 1.0f, 0.96f);
+        ImVec4 borderCol = ImVec4(0.82f, 0.84f, 0.85f, 1.0f);
+        dl->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y),
+            ImGui::GetColorU32(bgCol), RADIUS);
+        dl->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y),
+            ImGui::GetColorU32(borderCol), RADIUS, 0, 1.5f);
+
+        // ===== Заголовок "Найти место" =====
+        const ImVec4 textColor = ImVec4(0.05f, 0.25f, 0.65f, 1.0f);
+        const float  ICON_SIZE = 18.0f;
+        const float  LINE_H = 24.0f;
+
+        ImGui::SetCursorPos(ImVec2(20, 16));
+        ImGui::PushStyleColor(ImGuiCol_Text, textColor);
+
+        // Иконка маркера перед текстом
+        ImGui::TextUnformatted(u8"\uf3c5");  // FontAwesome "map-marker-alt"
+        ImVec2 iconMax = ImGui::GetItemRectMax();
+
+        ImGui::SameLine();
+        ImGui::SetCursorPosY(16.0f); // выравнивание текста по уровню иконки
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 4.0f);
+        ImGui::TextUnformatted("Найти место");
+        ImGui::PopStyleColor();
+
+        // ===== Поле ввода =====
+        static std::string query;
+        ImGui::PushItemWidth(-22);
+        ImGui::SetCursorPos(ImVec2(16, 46));
+
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.96f, 0.98f, 1.0f, 0.55f));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.15f, 0.16f, 0.20f, 1.0f));
+
+        // рисуем иконку СЛЕВА во внутреннем отступе, чтобы текст начинался после неё
+        ImVec2 fieldStart = ImGui::GetCursorScreenPos();
+        ImVec2 iconPos = ImVec2(fieldStart.x + 10, fieldStart.y + 6);
+
+        ImGui::SetCursorScreenPos(iconPos);
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.52f, 0.65f, 1.0f));
+        ImGui::TextUnformatted(u8"\uf002");
+        ImGui::PopStyleColor();
+
+        // отступ после иконки — чтобы текст не наезжал
+        ImGui::SetCursorScreenPos(ImVec2(fieldStart.x + 28, fieldStart.y));
+
+        bool submitted = ImGui::InputTextWithHint("##placeField",
+            "Поиск аудиторий, кабинетов...", &query);
+
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar();
+
+        // Координаты поля
+        ImVec2 a = ImGui::GetItemRectMin();
+        ImVec2 b = ImGui::GetItemRectMax();
+
+        // рамка при фокусе
+        if (ImGui::IsItemActive())
+            dl->AddRect(a, b,
+                ImGui::GetColorU32(ImVec4(0.00f, 0.45f, 0.95f, 1.00f)),
+                8.0f, 0, 2.0f);
 
         ImGui::PopItemWidth();
-
-        //------------------------------------------------------------------
-        // 🚀 Кнопка — ровная и спокойная, без быстрых пульсаций
-        //------------------------------------------------------------------
-        float tNow = SDL_GetTicks() * 0.00025f;   // очень медленное дыхание цвета
-        float pulse = 0.6f + 0.4f * sinf(tNow);   // едва заметное колебание
-        ImVec4 baseColor = ImVec4(0.02f, 0.44f + 0.15f * pulse, 0.95f, 1.0f);
-        ImVec4 hoverColor = ImVec4(0.10f, 0.55f + 0.10f * pulse, 1.00f, 1.0f);
-        ImVec4 activeColor = ImVec4(0.00f, 0.50f, 1.00f, 1.0f);
-
-        constexpr float BUTTON_HEIGHT = 45.0f;   // чуть выше стандартной строки, но не громоздко
-        constexpr float BUTTON_WIDTH_PCT = 0.85f; // ширина кнопки = 85 % от панели
-
-        ImVec2 avail = ImGui::GetContentRegionAvail();
-        float btnWidth = avail.x * BUTTON_WIDTH_PCT;
-
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail.x - btnWidth) * 0.5f); // выравнивание по центру
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-        ImGui::PushStyleColor(ImGuiCol_Button, baseColor);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, hoverColor);
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, activeColor);
-
-        if (ImGui::Button("\uf4d7 Построить путь", ImVec2(btnWidth, BUTTON_HEIGHT)))
-            mapViewer.buildPathFromAliases(fromStr, toStr);
-
-        ImVec2 bPos = ImGui::GetItemRectMin();
-        ImVec2 bSize = ImGui::GetItemRectSize();
-        ImU32 shineTop = ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 0.12f));
-        ImU32 shineBot = ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 0.0f));
-        dl->AddRectFilledMultiColor(
-            ImVec2(bPos.x, bPos.y),
-            ImVec2(bPos.x + bSize.x, bPos.y + bSize.y * 0.4f),
-            shineTop, shineTop, shineBot, shineBot);
-
-        ImGui::PopStyleColor(3);
-        ImGui::PopStyleVar();
     }
     ImGui::End();
 }
@@ -434,244 +419,235 @@ void UIManager::drawDevInfoWindow(MapViewer& mapViewer) {
     ImGui::End();
 }
 
-
-// === Node Inspector ===
-// === Верхняя панель навигации (чистый визуальный слой) ===
-void UIManager::drawTopNavBar(MapViewer& viewer) {
-    using namespace Layout;
-
-    constexpr float HEADER_H = HEADER_HEIGHT;
-    constexpr float LOGO_MARGIN_X = 24.0f;
-    constexpr float LOGO_MARGIN_Y = 13.0f;
-    constexpr float SEARCH_WIDTH = 420.0f;
-    constexpr float SEARCH_HEIGHT = 32.0f;
-    constexpr float BTN_WIDTH = 120.0f;
-    constexpr float BTN_HEIGHT = 34.0f;
-    constexpr float ITEM_SPACING = 18.0f;
-
+// === Нижняя центральная панель навигации MISIS ===
+void UIManager::drawBottomMenuBar(MapViewer& viewer) {
     ImGuiIO& io = ImGui::GetIO();
     float screenW = io.DisplaySize.x;
+    float screenH = io.DisplaySize.y;
 
-    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(screenW, HEADER_H), ImGuiCond_Always);
+    // Геометрия панели
+    const float PANEL_H = 80.0f;
+    const float PANEL_MARGIN_BOTTOM = 20.0f;
+    const float PANEL_RADIUS = 16.0f;
+    const float PANEL_W_SCALE = 0.9f; //если нудно длину по Ox поменять
 
-    // ==== Начало окна-шапки ====
-    if (ImGui::Begin("\u1f9ed TopNavigation", nullptr,
-        ImGuiWindowFlags_NoMove |
-        ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoCollapse |
+    // Список элементов: {иконка, подпись}
+    static const std::pair<const char*, const char*> items[] = {
+        { u8"\uf2e7", "Столовые"    },
+        { u8"\uf02d", "Библиотеки"  },
+        { u8"\uf0f4", "Кофейни"     },
+        { u8"\uf19c", "Аудитории"   },
+        { u8"\uf1eb", "Wi‑Fi зоны"  },
+        { u8"\uf059", "Справка"     }
+    };
+
+    const int COUNT = IM_ARRAYSIZE(items);
+    const float ICON_SIZE = 32.0f;
+    const float TEXT_HEIGHT = 18.0f;
+    const float BLOCK_W = 100.0f;
+    const float BLOCK_SPACING = 60.0f; // расстояние между блоками
+    const float PANEL_W = (COUNT * BLOCK_W + (COUNT - 1) * BLOCK_SPACING);
+
+    // Центрирование панели
+    float panelX = (screenW - PANEL_W) * 0.5f;
+    float panelY = screenH - PANEL_H - PANEL_MARGIN_BOTTOM;
+
+    ImGui::SetNextWindowPos(ImVec2(panelX, panelY), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(PANEL_W, PANEL_H), ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.97f);
+
+    if (ImGui::Begin("BottomNavMISIS", nullptr,
         ImGuiWindowFlags_NoTitleBar |
-        ImGuiWindowFlags_NoScrollbar))
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoScrollbar |
+        ImGuiWindowFlags_NoScrollWithMouse |
+        ImGuiWindowFlags_NoCollapse))
     {
-        ImDrawList* draw = ImGui::GetWindowDrawList();
+        ImDrawList* dl = ImGui::GetWindowDrawList();
         ImVec2 pos = ImGui::GetWindowPos();
         ImVec2 size = ImGui::GetWindowSize();
 
-        // --- Подложка: лёгкий градиент фирменных оттенков MISIS ---
-        ImU32 top = ImGui::GetColorU32(ImVec4(0.00f, 0.32f, 0.68f, 1.0f));   // глубокий синий #004C97
-        ImU32 bottom = ImGui::GetColorU32(ImVec4(0.00f, 0.53f, 0.85f, 1.0f)); // светлый акцент #009EE3
-        draw->AddRectFilledMultiColor(
-            pos,
-            ImVec2(pos.x + size.x, pos.y + size.y),
-            top, top, bottom, bottom
-        );
+        // === Фон панели ===
+        ImVec4 bgColor = ImVec4(1.0f, 1.0f, 1.0f, 0.96f);
+        ImVec4 borderColor = ImVec4(0.82f, 0.84f, 0.85f, 1.0f);
+        dl->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y),
+            ImGui::GetColorU32(bgColor), PANEL_RADIUS);
+        dl->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y),
+            ImGui::GetColorU32(borderColor), PANEL_RADIUS, 0, 1.5f);
 
-        // === Логотип MISIS ===
-        ImGui::SetCursorPos(ImVec2(LOGO_MARGIN_X, -10.0f));
-        if (logoTexture)
-        {
-            int texW = 0, texH = 0;
-            SDL_QueryTexture(logoTexture, nullptr, nullptr, &texW, &texH);
+        // Центральная координата панели
+        float midY = pos.y + size.y * 0.5f;
 
-            // Подгоним логотип в разумные пределы, чтобы точно был видим
-            float maxLogoH = 80.0f;        // высота примерно под шапку
-            float scale = maxLogoH / texH; // масштаб по высоте
-            ImVec2 logoSize(texW * scale, texH * scale);
+        // цвета иконок
+        ImVec4 defaultIconCol = ImVec4(0.06f, 0.40f, 0.95f, 1.0f);  // фирменный синий
+        ImVec4 activeIconCol = ImVec4(0.00f, 0.60f, 1.0f, 1.0f);  // голубой ярче
 
-            ImGui::Image((ImTextureID)logoTexture, logoSize);
-        }
-        else
-        {
-            ImGui::TextColored(ImVec4(1, 1, 1, 1), "MISIS Campus Map 2025");
-        }
+        // расчёт позиций
+        float startX = pos.x + BLOCK_W * 0.5f;
 
-        // === Глобальный поиск ===
-        float searchX = SIDEBAR_WIDTH + ITEM_SPACING * 2;
-        float searchY = 14.0f;
-        ImGui::SetCursorPos(ImVec2(searchX, searchY));
-
-        static std::string globalSearchQuery;
-        ImGui::PushItemWidth(SEARCH_WIDTH);
-
-        // Форма поискового поля — белое, округлое
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(1, 1, 1, 0.96f));
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.1f, 0.12f, 0.18f, 1));
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1, 1, 1, 0.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.88f, 0.93f, 1.0f, 0.4f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.85f, 0.90f, 1.0f, 0.5f));
 
-        ImGui::InputTextWithHint("##GlobalSearch",
-            "\uf03a Найдите аудиторию, лабораторию или корпус...",
-            &globalSearchQuery);
+        for (int i = 0; i < COUNT; ++i) {
+            const char* icon = items[i].first;
+            const char* label = items[i].second;
 
-        ImGui::PopStyleColor(2);
+            float blockX = startX + i * (BLOCK_W + BLOCK_SPACING);
+            float iconY = midY - ICON_SIZE * 0.9f;
+            float textY = iconY + ICON_SIZE + 6.0f;
+
+            // === Иконка ===
+            ImGui::SetCursorScreenPos(ImVec2(blockX - ICON_SIZE * 0.5f, iconY));
+            ImGui::PushFont(io.Fonts->Fonts[0]);
+            ImVec4 col = ImGui::IsMouseHoveringRect(ImVec2(blockX - 20, iconY - 4),
+                ImVec2(blockX + 20, textY + 10))
+                ? activeIconCol : defaultIconCol;
+            ImGui::PushStyleColor(ImGuiCol_Text, col);
+            ImGui::Button(icon, ImVec2(ICON_SIZE, ICON_SIZE));
+            ImGui::PopStyleColor();
+            ImGui::PopFont();
+
+            // === Текст ===
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.12f, 0.15f, 0.22f, 1.0f));
+            ImVec2 textSize = ImGui::CalcTextSize(label);
+            ImGui::SetCursorScreenPos(ImVec2(blockX - textSize.x * 0.5f, textY));
+            ImGui::TextUnformatted(label);
+            ImGui::PopStyleColor();
+        }
+
+        ImGui::PopStyleColor(3);
         ImGui::PopStyleVar();
-        ImGui::PopItemWidth();
-
-        //--------------------------------------------------
-        // 🔘 Справа — блок контрастных белых кнопок
-        //--------------------------------------------------
-        float btnY = (HEADER_H - BTN_HEIGHT) * 0.5f;
-
-        // Правая кнопка (Полный экран)
-        float btnRightMargin = 20.0f;         // отступ от правого края окна
-        float fullBtnWidth = 150.0f;        // ширина кнопки "В полный экран"
-        float langBtnWidth = 110.0f;        // ширина кнопки "Рус / Eng"
-        float btnGap = 10.0f;         // зазор между кнопками
-
-        float fullBtnX = screenW - fullBtnWidth - btnRightMargin;
-        float langBtnX = fullBtnX - langBtnWidth - btnGap;
-
-        // общие стили белых кнопок
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));   // чисто белая заливка
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.95f, 0.97f, 1.0f, 1.0f)); // лёгкий подсвет при hover
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.90f, 0.93f, 0.98f, 1.0f)); // мягкое нажатие
-        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.65f, 0.70f, 0.85f, 1.0f)); // серо‑голубая рамка
-
-        // --- Кнопка языка ---
-        ImGui::SetCursorPos(ImVec2(langBtnX, btnY));
-        ImGui::Button("\u80ac  Рус / Eng", ImVec2(langBtnWidth, BTN_HEIGHT));
-        ImGui::PopStyleColor(4);
-        ImGui::SameLine();
-
-        // --- кнопка "в полный экран" ---
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.95f, 0.97f, 1.0f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.90f, 0.93f, 0.98f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.65f, 0.70f, 0.85f, 1.0f));
-
-        ImGui::SetCursorPos(ImVec2(fullBtnX, btnY));
-        if (ImGui::Button("\u26f6  В полный экран", ImVec2(fullBtnWidth, BTN_HEIGHT))) {
-            SDL_Window* win = SDL_GL_GetCurrentWindow();
-            Uint32 flags = SDL_GetWindowFlags(win);
-            bool isFull = (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) != 0;
-            SDL_SetWindowFullscreen(win, isFull ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP);
-        }
-        ImGui::PopStyleColor(4);
-        ImGui::PopStyleVar(2);
     }
     ImGui::End();
 }
 
-// === Левая боковая панель (Sidebar / Избранное) ===
-void UIManager::drawLeftSidebar(MapViewer& viewer) {
-    using namespace Layout;
-
-    static bool collapsed = false;
-    static int  selected = -1;
-
-    constexpr float ITEM_HEIGHT = 42.0f;
-    constexpr float INDICATOR_W = 4.0f;
-    constexpr float ICON_SIZE = 20.0f;
-    constexpr float CARD_ALPHA = 0.98f;
-    constexpr float PADDING_X = 18.0f;
-    constexpr float PADDING_Y = 12.0f;
-
+// === Компактная верхняя панель MISIS — финальный вариант ===
+void UIManager::drawTopNavBar(MapViewer& viewer) {
     ImGuiIO& io = ImGui::GetIO();
-    float sidebarWidth = collapsed ? 72.0f : SIDEBAR_WIDTH;
-    float sidebarHeight = io.DisplaySize.y - HEADER_HEIGHT;
+    float screenW = io.DisplaySize.x;
 
-    ImGui::SetNextWindowPos(ImVec2(0, HEADER_HEIGHT));
-    ImGui::SetNextWindowSize(ImVec2(sidebarWidth, sidebarHeight));
-    ImGui::SetNextWindowBgAlpha(CARD_ALPHA);
+    // Базовые параметры адаптивного окна
+    constexpr float PANEL_H_BASE = 90.0f;
+    constexpr float SHRINK_Y = 0.8f;
+    constexpr float EXPAND_X = 1.2f;
+    constexpr float TOP_MARGIN = 20.0f;
+    constexpr float LOGO_MAX_H = 68.0f;
+    constexpr float BTN_SIZE = 36.0f;
 
-    if (ImGui::Begin("📚 Sidebar", nullptr,
-        ImGuiWindowFlags_NoMove |
-        ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoCollapse |
+    // ширина панели от реального логотипа
+    float baseW = 320.0f;
+    if (logoTexture) {
+        int w, h;
+        SDL_QueryTexture(logoTexture, nullptr, nullptr, &w, &h);
+        if (w > 0 && h > 0)
+            baseW = static_cast<float>(w) * (LOGO_MAX_H / h) + 120.0f;
+    }
+
+    // применяем масштаб
+    float panelW = baseW * EXPAND_X;
+    float panelH = PANEL_H_BASE * SHRINK_Y;
+    float panelX = (screenW - panelW) * 0.5f;
+    float panelY = TOP_MARGIN;
+
+    ImGui::SetNextWindowPos(ImVec2(panelX, panelY), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(panelW, panelH), ImGuiCond_Always);
+
+    ImGui::SetNextWindowBgAlpha(0.96f);
+
+    if (ImGui::Begin("TopBarMISIS_Compact", nullptr,
         ImGuiWindowFlags_NoTitleBar |
-        ImGuiWindowFlags_NoScrollbar))
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoScrollbar |
+        ImGuiWindowFlags_NoScrollWithMouse |
+        ImGuiWindowFlags_NoCollapse))
     {
-        // --- Карточная подложка и рамка ---
         ImDrawList* dl = ImGui::GetWindowDrawList();
         ImVec2 pos = ImGui::GetWindowPos();
         ImVec2 size = ImGui::GetWindowSize();
-        dl->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y),
-            ImGui::GetColorU32(ImVec4(1, 1, 1, 0.97f)), 10.0f);
-        dl->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y),
-            ImGui::GetColorU32(ImVec4(0, 0, 0, 0.06f)), 10.0f, 0, 2.0f);
 
-        // --- Гамбургер / заголовок меню ---
-        ImGui::SetCursorPos(ImVec2(PADDING_X, PADDING_Y));
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.92f, 0.94f, 0.98f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.85f, 0.90f, 0.98f, 1.0f));
-        if (ImGui::Button(collapsed ? "\u2630" : "\u2630  Меню", ImVec2(-1, 40)))
-            collapsed = !collapsed;
-        ImGui::PopStyleColor(2);
-        ImGui::PopStyleVar();
+        // — матово‑белый фон и лёгкая серая рамка с округлёнными углами
+        const float RADIUS = 12.0f;
 
-        ImGui::Spacing();
-        ImGui::Separator();
+        ImVec4 bgColor = ImVec4(1.0f, 1.0f, 1.0f, 0.96f);
+        ImVec4 borderColor = ImVec4(0.82f, 0.84f, 0.85f, 1.0f);
 
-        // --- Основные пункты навигации ---
-        static const std::pair<const char*, const char*> items[] = {
-            { "\uf015", "Университет"},
-            { "\uf518", "Библиотека"},
-            { "\uf0f4", "Кафе и столовые" },
-            { "\uf5a2", "Спортцентр" },
-            { "\uf568", "Главная площадь" },
-            { "\uf015", "Администрация" }
-        };
+        dl->AddRectFilled(
+            pos, ImVec2(pos.x + size.x, pos.y + size.y),
+            ImGui::GetColorU32(bgColor), RADIUS
+        );
+        dl->AddRect(
+            pos, ImVec2(pos.x + size.x, pos.y + size.y),
+            ImGui::GetColorU32(borderColor), RADIUS, 0, 1.6f
+        );
 
-        for (int i = 0; i < IM_ARRAYSIZE(items); i++) {
-            ImVec2 btnPos = ImGui::GetCursorScreenPos();
-            ImVec2 btnSize = ImVec2(sidebarWidth - PADDING_X * 2, ITEM_HEIGHT);
+        // Центр панели по Y для вертикального выравнивания всех элементов
+        float centerY = pos.y + size.y * 0.5f;
 
-            bool hovered = ImGui::IsMouseHoveringRect(btnPos,
-                ImVec2(btnPos.x + btnSize.x, btnPos.y + btnSize.y));
-            bool clicked = ImGui::InvisibleButton(
-                ("##item" + std::to_string(i)).c_str(), btnSize);
+        // === Логотип MISIS ===
+        if (logoTexture) {
+            int tw, th;
+            SDL_QueryTexture(logoTexture, nullptr, nullptr, &tw, &th);
+            float scale = LOGO_MAX_H / static_cast<float>(th);
+            ImVec2 logoSize(tw * scale, th * scale);
 
-            if (clicked) {
-                selected = i;
-                viewer.getInputFrom() = items[i].second;
-                viewer.updateSuggestions();
-            }
-
-            // фон при наведении / выборе
-            ImU32 bgColor = 0;
-            if (selected == i)
-                bgColor = ImGui::GetColorU32(ImVec4(0.05f, 0.44f, 0.88f, 1.0f));
-            else if (hovered)
-                bgColor = ImGui::GetColorU32(ImVec4(0.86f, 0.90f, 0.97f, 1.0f));
-
-            if (bgColor)
-                dl->AddRectFilled(btnPos,
-                    ImVec2(btnPos.x + btnSize.x, btnPos.y + btnSize.y),
-                    bgColor, 8.0f);
-
-            // Индикация выбранного
-            if (selected == i)
-                dl->AddRectFilled(ImVec2(btnPos.x + 3, btnPos.y + 3),
-                    ImVec2(btnPos.x + 3 + INDICATOR_W, btnPos.y + btnSize.y - 3),
-                    ImGui::GetColorU32(ImVec4(1.0f, 0.7f, 0.2f, 1.0f)),
-                    3.0f);
-
-            // Текст и иконка
-            ImVec4 textCol = (selected == i)
-                ? ImVec4(1, 1, 1, 1)
-                : ImVec4(0.10f, 0.14f, 0.22f, 1.0f);
-            float textY = btnPos.y + (ITEM_HEIGHT - ICON_SIZE) * 0.5f;
-
-            dl->AddText(ImVec2(btnPos.x + 16.0f, textY),
-                ImGui::GetColorU32(textCol), items[i].first);
-
-            if (!collapsed) {
-                dl->AddText(ImVec2(btnPos.x + 16.0f + 28.0f, textY),
-                    ImGui::GetColorU32(textCol), items[i].second);
-            }
+            // вертикальное центрирование изображения
+            float logoY = centerY - logoSize.y * 0.5f;
+            ImGui::SetCursorScreenPos(ImVec2(pos.x + 18.0f, logoY));
+            ImGui::Image((ImTextureID)(intptr_t)logoTexture, logoSize);
         }
+        else {
+            ImGui::SetCursorScreenPos(ImVec2(pos.x + 20.0f, centerY - 10.0f));
+            ImGui::TextColored(ImVec4(0.0f, 0.35f, 0.75f, 1.0f), "MISIS");
+        }
+
+        // === Кнопки справа ===
+        const float totalBtnW = (BTN_SIZE * 2.0f) + 14.0f; // две кнопки и отступ
+        float btnStartX = pos.x + size.x - totalBtnW - 16.0f;
+        float btnY = centerY - BTN_SIZE * 0.5f; // строго по центру панели
+
+        ImGui::SetCursorScreenPos(ImVec2(btnStartX, btnY));
+
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.94f, 0.96f, 1.0f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.88f, 0.91f, 1.0f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.82f, 0.86f, 1.0f, 1.0f));
+
+        // 🌐 (FontAwesome \uf1ab) — переключение языка
+        const char* LANG_ICON = u8"\uf1ab";
+        const char* FULL_ICON = u8"\uf065"; // ⛶ fullscreen
+
+        if (ImGui::Button(LANG_ICON, ImVec2(BTN_SIZE, BTN_SIZE))) {
+            SDL_Log("[UI] Language switch clicked");
+        }
+        // «приподнятие» при наведении
+        if (ImGui::IsItemHovered()) {
+            ImVec2 min = ImGui::GetItemRectMin();
+            ImVec2 max = ImGui::GetItemRectMax();
+            dl->AddRect(min, max,
+                ImGui::GetColorU32(ImVec4(0.18f, 0.45f, 1.0f, 0.55f)),
+                10.0f, 0, 2.0f);
+            // лёгкий offset вверх
+            ImGui::SetCursorScreenPos(ImVec2(min.x, min.y - 1.0f));
+        }
+
+        ImGui::SameLine(0, 14.0f);
+
+        if (ImGui::Button(FULL_ICON, ImVec2(BTN_SIZE, BTN_SIZE))) {
+            SDL_Window* win = SDL_GL_GetCurrentWindow();
+            Uint32 flags = SDL_GetWindowFlags(win);
+            SDL_SetWindowFullscreen(win,
+                (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP);
+        }
+        if (ImGui::IsItemHovered())
+            dl->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
+                ImGui::GetColorU32(ImVec4(0.20f, 0.50f, 1.0f, 0.3f)), 10.0f, 0, 1.5f);
+
+        ImGui::PopStyleColor(3);
+        ImGui::PopStyleVar();
     }
     ImGui::End();
 }
@@ -820,123 +796,217 @@ void UIManager::drawRightPanel(MapViewer& viewer) {
 void UIManager::drawFloorBuildingPanel(MapViewer& mapViewer) {
     ImGuiIO& io = ImGui::GetIO();
     float screenW = io.DisplaySize.x;
-    float screenH = io.DisplaySize.y;
 
     //---------------------------------------------
-    // ГЕОМЕТРИЯ РАЗМЕЩЕНИЯ
+    // Геометрия окна — под окном "Найти место"
     //---------------------------------------------
-    const float PANEL_W = 250.0f;     // ширина блока
-    const float BUTTON_H = 36.0f;     // стандартная высота кнопок
-    const float GAP = 8.0f;           // промежутки
-    const float MARGIN_RIGHT = 25.0f; // отступ от правой стороны
-    const float PANEL_TOP = Layout::HEADER_HEIGHT + 250.0f; // под панелью маршрута
+    constexpr float PANEL_W = 260.0f;
+    constexpr float BUTTON_H = 28.0f;  // более компактные кнопки этажей
+    constexpr float MARGIN_RIGHT = 20.0f;
+    constexpr float TOP_OFFSET = 150.0f;  // расстояние от верха после "Найти место"
+    constexpr float GAP = 6.0f;
+    constexpr float RADIUS = 12.0f;
 
-    // число этажей влияет на высоту панели
+    // вычисляем количество этажей для динамической высоты
     int floorCount = 0;
     {
-        const BuildingMeta* meta = mapViewer.getGraphManager().getBuildingMeta(mapViewer.getCurrentBuilding());
-        if (meta)
-            floorCount = static_cast<int>(meta->floors.size());
+        const BuildingMeta* meta = mapViewer.getGraphManager()
+            .getBuildingMeta(mapViewer.getCurrentBuilding());
+        if (meta) floorCount = static_cast<int>(meta->floors.size());
     }
-    float PANEL_H = 300.0f + floorCount * (BUTTON_H + GAP);
+    float PANEL_H = 120.0f + floorCount * (BUTTON_H + GAP);
 
-    // конечные координаты угла окна:
     float panelX = screenW - PANEL_W - MARGIN_RIGHT;
-    float panelY = PANEL_TOP;
+    float panelY = TOP_OFFSET;
 
-    //---------------------------------------------
-    // НАСТРОЙКА ОКНА
-    //---------------------------------------------
     ImGui::SetNextWindowPos(ImVec2(panelX, panelY), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(PANEL_W, PANEL_H));
-    ImGui::SetNextWindowBgAlpha(0.95f);
+    ImGui::SetNextWindowBgAlpha(0.97f);
 
-    ImGuiWindowFlags flags =
-        ImGuiWindowFlags_NoTitleBar |
-        ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoCollapse |
-        ImGuiWindowFlags_NoMove |
-        ImGuiWindowFlags_NoScrollbar;
-
-    if (ImGui::Begin("🏢 BuildingFloorsPanel", nullptr, flags))
+    if (ImGui::Begin("BuildingFloorsCompact", nullptr,
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
     {
-        //---------------------------------------------
-        // КНОПКА ГЛАВНОГО ВИДА (КАМПУС)
-        //---------------------------------------------
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-        if (ImGui::Button("\uf279  Вид сверху (Кампус)", ImVec2(-1, BUTTON_H))) {
-            mapViewer.switchViewToCampus();
-        }
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        ImVec2 pos = ImGui::GetWindowPos();
+        ImVec2 size = ImGui::GetWindowSize();
 
-        ImGui::Dummy(ImVec2(0, GAP));
-        ImGui::Separator();
-        ImGui::Dummy(ImVec2(0, GAP));
+        // фон и рамка
+        ImVec4 bg = ImVec4(1.0f, 1.0f, 1.0f, 0.96f);
+        ImVec4 border = ImVec4(0.82f, 0.84f, 0.85f, 1.0f);
+        dl->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y),
+            ImGui::GetColorU32(bg), RADIUS);
+        dl->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y),
+            ImGui::GetColorU32(border), RADIUS, 0, 1.3f);
+
+        ImGui::SetCursorPos(ImVec2(16, 14));
 
         //---------------------------------------------
-        // ВЫПАДАЮЩИЙ СПИСОК КОРПУСОВ
+        // --- Строка "Выбор корпуса" + иконка здания
         //---------------------------------------------
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.05f, 0.25f, 0.65f, 1.0f));
+        ImGui::TextUnformatted(u8"\uf1ad"); // иконка здания (FontAwesome)
+        ImGui::SameLine(28);
+        ImGui::TextUnformatted("Корпус");
+        ImGui::PopStyleColor();
+
+        // выпадающий список корпусов
         const auto& metas = mapViewer.getGraphManager().buildingMetas;
         std::string currentBuilding = mapViewer.getCurrentBuilding();
 
-        ImGui::TextColored(ImVec4(0.0f, 0.33f, 0.7f, 1.0f), "Корпус");
-        ImGui::PushItemWidth(-1);
-
         const char* currentLabel =
-            currentBuilding.empty() ? "Выберите корпус..." : currentBuilding.c_str();
+            currentBuilding.empty() ? "— выберите корпус —" : currentBuilding.c_str();
 
-        if (ImGui::BeginCombo("##buildingSelect", currentLabel)) {
-            for (const auto& [bid, meta] : metas) {
-                bool selected = (bid == currentBuilding);
-                if (ImGui::Selectable(meta.name.c_str(), selected)) {
-                    // при выборе сразу открываем 1 этаж корпуса
-                    if (!meta.floors.empty())
-                        mapViewer.switchToFloor(bid, meta.floors.front().floor);
-                }
-                if (selected)
-                    ImGui::SetItemDefaultFocus();
-            }
+        static bool popupOpen = false;
+        ImVec2 comboMin{}, comboMax{};
+
+        ImGui::SetCursorPos(ImVec2(16, 42));
+        ImGui::PushItemWidth(PANEL_W - 32);
+
+        // --- старый BeginCombo для фикса: имитируем поведение, но логируем детально ---
+        if (ImGui::BeginCombo("##buildingSelectDebug", currentLabel)) {
+            std::cout << "[UI][DEBUG] ИмGui BeginCombo открыл базовое popup." << std::endl;
+            popupOpen = true;
             ImGui::EndCombo();
         }
         ImGui::PopItemWidth();
 
-        ImGui::Dummy(ImVec2(0, GAP));
-        ImGui::Separator();
-        ImGui::Dummy(ImVec2(0, GAP));
+        // координаты строки выбора корпуса
+        comboMin = ImGui::GetItemRectMin();
+        comboMax = ImGui::GetItemRectMax();
+
+        // лог текущего состояния
+        std::cout << "[UI][DEBUG] Cursor after combo. popupOpen=" << popupOpen
+            << " rect: (" << comboMin.x << "," << comboMin.y
+            << ")→(" << comboMax.x << "," << comboMax.y << ")" << std::endl;
+
+        if (popupOpen) {
+            const float popupW = 200.0f;
+            const float popupH = 240.0f;
+            const float popupShiftX = 25.0f;   // немного ближе к окну
+            const float popupShiftY = 0.0f;
+            const float CORNER_RADIUS = 8.0f;
+
+            ImGui::SetNextWindowPos(ImVec2(comboMin.x - popupW - popupShiftX,
+                comboMin.y + popupShiftY));
+            ImGui::SetNextWindowSize(ImVec2(popupW, popupH));
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, CORNER_RADIUS);
+            ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(1.0f, 1.0f, 1.0f, 0.97f)); // фон в стиле основного окна
+            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.82f, 0.84f, 0.85f, 1.0f));
+
+            if (ImGui::Begin("##BuildingListPopupFinal", &popupOpen,
+                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+                ImGuiWindowFlags_NoScrollbar))
+            {
+                // аккуратный верхний отступ
+                ImGui::Dummy(ImVec2(10, 6));
+
+                // иконка здания + заголовок
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.05f, 0.25f, 0.65f, 1.0f));
+                ImGui::SetCursorPosX(12);
+                ImGui::TextUnformatted(u8"\uf1ad");
+                ImGui::SameLine(30);
+                ImGui::TextUnformatted("Выберите корпус");
+                ImGui::PopStyleColor();
+
+                // отступ до списка
+                ImGui::Dummy(ImVec2(0, 8));
+                ImGui::Separator();
+                ImGui::Dummy(ImVec2(0, 6));
+
+                // задаём ширину элементов на всю ширину окна
+                const float totalW = popupW - 20.0f;
+                ImGui::PushItemWidth(totalW);
+
+                // список корпусов
+                for (const auto& [bid, meta] : metas) {
+                    bool selected = (bid == currentBuilding);
+                    ImGui::SetCursorPosX(10); // немного ближе к левой границе
+                    if (ImGui::Selectable(meta.name.c_str(), selected,
+                        ImGuiSelectableFlags_None,
+                        ImVec2(totalW, 28))) {
+                        if (!meta.floors.empty())
+                            mapViewer.switchToFloor(bid, meta.floors.front().floor);
+                        popupOpen = false;
+                    }
+                }
+
+                ImGui::Dummy(ImVec2(0, 4));
+                ImGui::Separator();
+                ImGui::Dummy(ImVec2(0, 4));
+
+                // кнопка "вид сверху (кампус)" – выделена приятным голубым оттенком, со скруглением
+                ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, CORNER_RADIUS);
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.93f, 1.0f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.80f, 0.90f, 1.0f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.75f, 0.87f, 1.0f, 1.0f));
+
+                ImGui::SetCursorPosX(10);
+                if (ImGui::Button("🏫 Вид сверху (кампус)", ImVec2(totalW, 30.0f))) {
+                    mapViewer.switchViewToCampus();
+                    popupOpen = false;
+                }
+
+                ImGui::PopStyleColor(3);
+                ImGui::PopStyleVar();
+                ImGui::PopItemWidth();
+            }
+            ImGui::End();
+
+            ImGui::PopStyleColor(2);
+            ImGui::PopStyleVar();
+
+            // закрываем при клике вне окна
+            if (!ImGui::IsWindowFocused(ImGuiFocusedFlags_AnyWindow) &&
+                ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+                popupOpen = false;
+        }
+
+        // клик по строке выбора корпуса открывает/закрывает popup
+        if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+            popupOpen = !popupOpen;
 
         //---------------------------------------------
-        // КНОПКИ ЭТАЖЕЙ (СТОЛБИК СВЕРХУ ВНИЗ)
+        // --- Надпись "Этажи"
         //---------------------------------------------
-        const BuildingMeta* bm = mapViewer.getGraphManager().getBuildingMeta(currentBuilding);
+        const BuildingMeta* bm =
+            mapViewer.getGraphManager().getBuildingMeta(currentBuilding);
         if (bm && !bm->floors.empty()) {
-            ImGui::TextColored(ImVec4(0.0f, 0.33f, 0.7f, 1.0f), "Этажи");
+            ImGui::SetCursorPos(ImVec2(16, 80));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.15f, 0.18f, 0.26f, 1.0f));
+            ImGui::TextUnformatted("Этажи:");
+            ImGui::PopStyleColor();
 
-            // формируем список этажей по убыванию
             std::vector<int> floors;
-            for (auto& f : bm->floors)
+            for (const auto& f : bm->floors)
                 floors.push_back(f.floor);
             std::sort(floors.begin(), floors.end(), std::greater<int>());
 
-            // кнопки по вертикали
+            // координата для начала перечисления
+            float y = 100.0f;
             for (int f : floors) {
+                ImGui::SetCursorPos(ImVec2(24, y));
                 bool active = (f == mapViewer.getCurrentFloor());
-                ImVec4 col = active ?
-                    ImVec4(0.08f, 0.50f, 1.0f, 1.0f) :
-                    ImVec4(1.0f, 1.0f, 1.0f, 0.96f);
+                ImVec4 col = active
+                    ? ImVec4(0.08f, 0.50f, 1.0f, 1.0f)
+                    : ImVec4(1.0f, 1.0f, 1.0f, 0.95f);
                 ImGui::PushStyleColor(ImGuiCol_Button, col);
-
-                std::string label = "Этаж " + std::to_string(f);
-                if (ImGui::Button(label.c_str(), ImVec2(-1, BUTTON_H))) {
+                std::string label = "Этаж " + std::to_string(f);
+                if (ImGui::Button(label.c_str(),
+                    ImVec2(PANEL_W - 48, BUTTON_H))) {
                     mapViewer.switchToFloor(currentBuilding, f);
                 }
                 ImGui::PopStyleColor();
-                ImGui::Dummy(ImVec2(0, GAP - 2.0f));
+                y += BUTTON_H + GAP;
             }
         }
         else {
+            ImGui::SetCursorPos(ImVec2(16, 90));
             ImGui::TextDisabled("Этажи отсутствуют");
         }
 
-        ImGui::PopStyleVar();
     }
     ImGui::End();
 }

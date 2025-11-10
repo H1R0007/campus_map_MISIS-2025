@@ -78,7 +78,7 @@ void Engine::initImGui() {
     io.Fonts->AddFontFromFileTTF("assets/UI/fonts/NotoEmoji-Regular.ttf", 18.0f, &cfg, emoji_range);
 
     cfg.MergeMode = true;
-    static const ImWchar fa_range[] = { 0xf000, 0xf3ff, 0 };
+    static const ImWchar fa_range[] = { 0xf000, 0xf976, 0 };
     io.Fonts->AddFontFromFileTTF("assets/UI/fonts/fa-solid-900.ttf", 16.0f, &cfg, fa_range);
 
     if (io.Fonts->Fonts.empty())
