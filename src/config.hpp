@@ -20,8 +20,8 @@ namespace Config {
     constexpr int MAP_HEIGHT = 780;
 
     // === Canvas (world space for camera) ===
-    constexpr int CANVAS_WIDTH = 2000;
-    constexpr int CANVAS_HEIGHT = 2000;
+    constexpr int CANVAS_WIDTH = 10000;
+    constexpr int CANVAS_HEIGHT = 10000;
 
     // === Zoom levels ===
     constexpr float MIN_ZOOM = 0.5f;
@@ -29,7 +29,7 @@ namespace Config {
 
     // === Alias, nodes, fonts ===
     constexpr const char* ALIASES_PATH = "assets/aliases.json";
-    constexpr const char* FONT_PATH = "assets/fonts/Roboto-Regular.ttf";
+    constexpr const char* FONT_PATH = "assets/UI/fonts/Roboto-Regular.ttf";
 
     // === Build/runtime modes ===
 

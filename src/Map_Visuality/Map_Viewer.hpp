@@ -31,7 +31,6 @@ public:
 
     // === Отрисовка ===
     void render();        // Отрисовка основной сцены (карта, узлы, пути)
-    void renderOverlay(); // Отрисовка UI поверх сцены (поля ввода, подсказки и т.д.)
 
     // === Методы-действия (вызываются из InputHandler) ===
     void buildPathFromAliases(const std::string& startName, const std::string& endName);
@@ -41,6 +40,51 @@ public:
 
     // === Getters (для доступа из других классов) ===
     GraphManager& getGraphManager() { return graphManager; }
+    std::string& getInputFrom() { return inputFrom; }
+    std::string& getInputTo() { return inputTo; }
+    const std::vector<std::string>& getCurrentSuggestions() const { return currentSuggestions; }
+    bool& getUserAllowStairs() { return userAllowStairs; }
+    bool& getUserAllowLift() { return userAllowLift; }
+    bool& getUserAllowBridge() { return userAllowBridge; }
+
+    // Access to debug info for the UI
+    const SDL_Point& getDebugMouseWorld() const { return debugMouseWorld; }
+    const Camera& getCamera() const { return camera; }
+
+    // === Accessors for external managers ===
+    AliasManager& getAliasManager() { return aliasManager; }
+    const AliasManager& getAliasManager() const { return aliasManager; }
+
+    // === Accessors for current building and floor (used by UI) ===
+    const std::string& getCurrentBuilding() const { return currentBuilding; }
+    int getCurrentFloor() const { return currentFloor; }
+
+    // Access to DEV mode state for the UI
+    const std::string& getInspectorNodeId() const { return inspectorNodeId; }
+    const std::string& getNeighborModeActiveId() const { return activeNodeId; }
+    bool isNeighborModeActive() const { return neighborMode; }
+    Uint32 getLastSaveTick() const { return lastSaveTick; }
+
+   /* bool isTransitionActive() const { return transitionActive; }
+    float getTransitionProgress() const {
+        if (!transitionActive) return 0.0f;
+        float elapsed = (SDL_GetTicks() - transitionStart) / 1000.0f;
+        return std::min(elapsed / 0.6f, 1.0f);
+    }
+    void completeTransition() { transitionActive = false; transitionAlpha = 0.0f; targetMapPath.clear(); }
+    const std::string& getTargetMapPath() const { return targetMapPath; }
+    void loadTargetMap() { if (!targetMapPath.empty()) loadMap(targetMapPath); }
+    SDL_Renderer* getRenderer();*/
+
+    // Setters and getters for UI state
+    void setEditingFrom(bool isEditingFrom) { editingFrom = isEditingFrom; }
+    bool isEditingFrom() const { return editingFrom; }
+
+    // Method to manually clear suggestions
+    void clearSuggestions() { currentSuggestions.clear(); }
+
+    // Метод для обновления подсказок, который будет вызываться каждый кадр
+    void updateSuggestions();
 
 private:
     // Даем классам-помощникам доступ к приватному состоянию этого класса
@@ -96,6 +140,12 @@ private:
     bool userAllowLift = true;
     bool userAllowBridge = true;
     bool debugDrawNodes = true; // Показывать/скрывать узлы в DEV-режиме
+
+    // --- Плавные переходы между этажами/корпусами ---
+    /*bool transitionActive = false;
+    float transitionAlpha = 0.0f;
+    Uint32 transitionStart = 0;
+    std::string targetMapPath;*/
 
     // --- Приватные хелперы, используемые внутри класса ---
     void loadMap(const std::string& path);

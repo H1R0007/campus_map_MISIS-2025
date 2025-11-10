@@ -15,6 +15,7 @@ struct Node;
 class MapRenderer {
 public:
     MapRenderer(SDL_Renderer* renderer);
+    // SDL_Renderer* getRenderer() const { return renderer; }
     ~MapRenderer();
 
     bool loadMapTexture(const std::string& path);
@@ -39,27 +40,9 @@ public:
         const SDL_Point& lineToolEnd
     );
 
-    // Отрисовка всего пользовательского интерфейса поверх сцены
-    void renderUI(
-        const Camera& camera,
-        const GraphManager& graphManager,
-        const SDL_Point& debugMouseWorld,
-        const std::string& inputFrom,
-        const std::string& inputTo,
-        bool editingFrom,
-        const std::vector<std::string>& suggestions,
-        int selectedSuggestion,
-        bool userAllowStairs,
-        bool userAllowLift,
-        bool userAllowBridge,
-        const std::string& neighborModeActiveId,
-        const std::string& inspectorNodeId,
-        Uint32 lastSaveTick,
-        bool devMode
-    );
-
     // Хелпер для получения размеров отрисованного текста (нужен для InputHandler)
     SDL_Rect getTextSize(const std::string& text);
+    SDL_Renderer* getRenderer() const { return renderer; }
 
 private:
     SDL_Renderer* renderer;

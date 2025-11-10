@@ -26,6 +26,8 @@ MapViewer::MapViewer(SDL_Renderer* renderer) {
     // 3. Устанавливаем начальное состояние приложения
     switchViewToCampus(); // Устанавливаем вид на кампус
     camera.setWorldSize(Config::CANVAS_WIDTH, Config::CANVAS_HEIGHT);
+
+    SDL_Delay(500);
 }
 
 MapViewer::~MapViewer() {}
@@ -41,6 +43,31 @@ void MapViewer::handleEvent(SDL_Event& event) {
 
 // === Rendering ===
 void MapViewer::render() {
+
+    SDL_Renderer* r = mapRenderer->getRenderer();
+
+    // Цвет фона
+    SDL_SetRenderDrawColor(r, 10, 15, 25, 255); // тёмно‑синий фон
+    SDL_RenderClear(r);
+
+    // Параметры сетки
+    const int gridStep = 100;             // шаг сетки в пикселях
+    const SDL_Color gridColor = { 0, 174, 255, 15 }; // rgb с альфой ≈0.06
+    int w = Config::CANVAS_WIDTH;
+    int h = Config::CANVAS_HEIGHT;
+
+    // Включаем полупрозрачное рисование
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(r, gridColor.r, gridColor.g, gridColor.b, gridColor.a);
+
+    // Вертикальные линии
+    for (int x = 0; x < w; x += gridStep)
+        SDL_RenderDrawLine(r, x, 0, x, h);
+
+    // Горизонтальные линии
+    for (int y = 0; y < h; y += gridStep)
+        SDL_RenderDrawLine(r, 0, y, w, y);
+
     std::string viewStr = (currentView == ViewMode::Campus) ? "campus" : "floor";
     mapRenderer->renderScene(
         camera,
@@ -59,42 +86,6 @@ void MapViewer::render() {
         lineToolActive && lineToolFirstPointSet, // Рисуем только если первая точка установлена
         lineToolStart,
         lineToolEnd
-    );
-}
-
-void MapViewer::renderOverlay() {
-    // Перед отрисовкой UI обновляем состояние, которое от него зависит
-
-    // 1. Обновляем области клика для полей ввода
-    fromFieldRect = mapRenderer->getTextSize("OTKYDA: " + inputFrom + "_");
-    fromFieldRect.x = 10; fromFieldRect.y = 60;
-    toFieldRect = mapRenderer->getTextSize("KYDA: " + inputTo + "_");
-    toFieldRect.x = 10; toFieldRect.y = 90;
-
-    // 2. Обновляем список подсказок на основе текущего ввода
-    std::string currentInput = editingFrom ? inputFrom : inputTo;
-    currentSuggestions.clear();
-    if (!currentInput.empty()) {
-        currentSuggestions = aliasManager.suggest(currentInput, 3);
-    }
-
-    // 3. Делегируем отрисовку UI рендереру, передавая ему всё актуальное состояние
-    mapRenderer->renderUI(
-        camera,
-        graphManager,
-        debugMouseWorld,
-        inputFrom,
-        inputTo,
-        editingFrom,
-        currentSuggestions,
-        selectedSuggestionIndex,
-        userAllowStairs,
-        userAllowLift,
-        userAllowBridge,
-        neighborMode ? activeNodeId : "", // Передаем ID только если режим активен
-        inspectorNodeId,
-        lastSaveTick,
-        Config::DEV_MODE
     );
 }
 
@@ -203,4 +194,14 @@ void MapViewer::createNodeLine(const SDL_Point& startWorld, float angleDeg, int 
     }
 
     std::cout << "[LineTool] Built a line of " << newIds.size() << " nodes.\n";
+}
+
+void MapViewer::updateSuggestions() {
+    // Determine the currently active input string
+    std::string& currentInput = editingFrom ? inputFrom : inputTo;
+
+    currentSuggestions.clear();
+    if (!currentInput.empty()) {
+        currentSuggestions = aliasManager.suggest(currentInput, 3);
+    }
 }

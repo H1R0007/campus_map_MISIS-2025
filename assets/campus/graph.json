@@ -1,40 +1,50 @@
 {
-  "nodes": [
-    {
-      "id": "CAMPUS_0_SQUARE",
-      "x": 200,
-      "y": 200,
-      "building": "CAMPUS",
-      "floor": 0,
-      "isPortal": false,
-      "neighbors": [ "CAMPUS_0_GATE_A", "CAMPUS_0_GATE_B", "CAMPUS_0_GATE_C" ]
-    },
-    {
-      "id": "CAMPUS_0_GATE_A",
-      "x": 400,
-      "y": 150,
-      "building": "CAMPUS",
-      "floor": 0,
-      "isPortal": true,
-      "neighbors": [ "CAMPUS_0_SQUARE" ]
-    },
-    {
-      "id": "CAMPUS_0_GATE_B",
-      "x": 100,
-      "y": 400,
-      "building": "CAMPUS",
-      "floor": 0,
-      "isPortal": true,
-      "neighbors": [ "CAMPUS_0_SQUARE" ]
-    },
-    {
-      "id": "CAMPUS_0_GATE_C",
-      "x": 350,
-      "y": 400,
-      "building": "CAMPUS",
-      "floor": 0,
-      "isPortal": true,
-      "neighbors": [ "CAMPUS_0_SQUARE" ]
-    }
-  ]
+    "nodes": [
+        {
+            "building": "CAMPUS",
+            "floor": 0,
+            "id": "CAMPUS_0_SQUARE",
+            "isPortal": false,
+            "neighbors": [
+                "CAMPUS_0_GATE_A",
+                "CAMPUS_0_GATE_B",
+                "CAMPUS_0_GATE_C"
+            ],
+            "x": 200,
+            "y": 200
+        },
+        {
+            "building": "CAMPUS",
+            "floor": 0,
+            "id": "CAMPUS_0_GATE_A",
+            "isPortal": true,
+            "neighbors": [
+                "CAMPUS_0_SQUARE"
+            ],
+            "x": 400,
+            "y": 150
+        },
+        {
+            "building": "CAMPUS",
+            "floor": 0,
+            "id": "CAMPUS_0_GATE_B",
+            "isPortal": true,
+            "neighbors": [
+                "CAMPUS_0_SQUARE"
+            ],
+            "x": 100,
+            "y": 400
+        },
+        {
+            "building": "CAMPUS",
+            "floor": 0,
+            "id": "CAMPUS_0_GATE_C",
+            "isPortal": true,
+            "neighbors": [
+                "CAMPUS_0_SQUARE"
+            ],
+            "x": 350,
+            "y": 400
+        }
+    ]
 }
