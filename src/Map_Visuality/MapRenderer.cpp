@@ -2,6 +2,7 @@
 #include "../config.hpp"
 #include "../Camera/Camera.hpp"
 #include "../map/GraphManager.hpp"
+#include <SDL2_gfxPrimitives.h>
 #include <iostream>
 
 MapRenderer::MapRenderer(SDL_Renderer* renderer)
@@ -39,7 +40,8 @@ bool MapRenderer::loadMapTexture(const std::string& path) {
     return true;
 }
 
-void MapRenderer::renderScene(
+void MapRenderer::renderScene
+(
     const Camera& camera, 
     const GraphManager& graphManager, 
     const std::string& currentView,
@@ -55,7 +57,8 @@ void MapRenderer::renderScene(
     bool neighborMode, 
     bool lineToolActive, 
     const SDL_Point& lineToolStart, 
-    const SDL_Point& lineToolEnd)
+    const SDL_Point& lineToolEnd
+)
 {
     // 1. Отрисовка карты
     if (mapTexture) {
@@ -183,7 +186,9 @@ void MapRenderer::renderScene(
 
     // 3. Отрисовка построенного пути
     if (!currentPath.empty()) {
-        SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Синий цвет для пути
+        Uint8 r = 55, g = 235, b = 255, a = 255; // Голубой цвет (МИСИС)
+        int thickness = 5; // Отвечает за жирность 
+
         for (size_t i = 1; i < currentPath.size(); i++) {
             const Node* from = graphManager.getNode(currentPath[i - 1]);
             const Node* to = graphManager.getNode(currentPath[i]);
@@ -200,7 +205,14 @@ void MapRenderer::renderScene(
             if (shouldDraw) {
                 SDL_Point scrA = camera.worldToScreen({ from->x, from->y });
                 SDL_Point scrB = camera.worldToScreen({ to->x, to->y });
-                SDL_RenderDrawLine(renderer, scrA.x, scrA.y, scrB.x, scrB.y);
+
+                // for для обработки и отрисовки жирности
+                for (int dx = -thickness / 2; dx <= thickness / 2; ++dx)
+                    for (int dy = -thickness / 2; dy <= thickness / 2; ++dy)
+                        aalineRGBA(renderer,
+                            scrA.x + dx, scrA.y + dy,
+                            scrB.x + dx, scrB.y + dy,
+                            r, g, b, a);
             }
         }
     }
