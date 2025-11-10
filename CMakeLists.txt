@@ -23,6 +23,7 @@ else()
   target_compile_options(campus_map PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
+
 if (EMSCRIPTEN)
   message(STATUS "Target: Web (Emscripten)")
   set(CMAKE_EXECUTABLE_SUFFIX ".html")
