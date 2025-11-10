@@ -64,15 +64,23 @@ if (EMSCRIPTEN)
 else()
   message(STATUS "Target: Native (Windows)")
   find_package(SDL2 CONFIG REQUIRED)
+  find_package(sdl2-gfx CONFIG REQUIRED)
+
   if (USE_SDL_IMAGE)
     find_package(SDL2_image CONFIG REQUIRED)
     target_link_libraries(campus_map PRIVATE SDL2_image::SDL2_image)
   endif()
+
   if (USE_SDL_TTF)
     find_package(SDL2_ttf CONFIG REQUIRED)
     target_link_libraries(campus_map PRIVATE SDL2_ttf::SDL2_ttf)
   endif()
-  target_link_libraries(campus_map PRIVATE SDL2::SDL2 SDL2::SDL2main)
+
+  target_link_libraries(campus_map PRIVATE
+    SDL2::SDL2
+    SDL2::SDL2main
+    SDL2::SDL2_gfx
+  )
 
   # nlohmann_json через vcpkg
   find_package(nlohmann_json CONFIG REQUIRED)
