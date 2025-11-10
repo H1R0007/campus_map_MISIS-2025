@@ -16,6 +16,19 @@
         {
             "building": "CAMPUS",
             "floor": 0,
+            "id": "CAMPUS_0_NODE_202",
+            "isPortal": false,
+            "neighbors": [
+                "CAMPUS_0_NODE_219",
+                "CAMPUS_0_NODE_218",
+                "CAMPUS_0_NODE_211"
+            ],
+            "x": 4475,
+            "y": 4685
+        },
+        {
+            "building": "CAMPUS",
+            "floor": 0,
             "id": "CAMPUS_0_GATE_A",
             "isPortal": true,
             "neighbors": [
@@ -45,6 +58,247 @@
             ],
             "x": 350,
             "y": 400
+        },
+        {
+            "building": "CAMPUS",
+            "floor": 0,
+            "id": "CAMPUS_0_NODE_203",
+            "isPortal": false,
+            "neighbors": [
+                "CAMPUS_0_NODE_208",
+                "CAMPUS_0_NODE_211",
+                "CAMPUS_0_NODE_212",
+                "CAMPUS_0_NODE_210",
+                "CAMPUS_0_NODE_213"
+            ],
+            "x": 4668,
+            "y": 4686
+        },
+        {
+            "building": "CAMPUS",
+            "floor": 0,
+            "id": "CAMPUS_0_NODE_204",
+            "isPortal": false,
+            "neighbors": [
+                "CAMPUS_0_NODE_210",
+                "CAMPUS_0_NODE_215",
+                "CAMPUS_0_NODE_214",
+                "CAMPUS_0_NODE_217",
+                "CAMPUS_0_NODE_205",
+                "CAMPUS_0_NODE_216"
+            ],
+            "x": 4895,
+            "y": 4684
+        },
+        {
+            "building": "CAMPUS",
+            "floor": 0,
+            "id": "CAMPUS_0_NODE_205",
+            "isPortal": false,
+            "neighbors": [
+                "CAMPUS_0_NODE_204",
+                "CAMPUS_0_NODE_216",
+                "CAMPUS_0_NODE_217"
+            ],
+            "x": 5003,
+            "y": 4682
+        },
+        {
+            "building": "CAMPUS",
+            "floor": 0,
+            "id": "CAMPUS_0_NODE_206",
+            "isPortal": false,
+            "neighbors": [
+                "CAMPUS_0_NODE_212",
+                "CAMPUS_0_NODE_210",
+                "CAMPUS_0_NODE_214"
+            ],
+            "x": 4790,
+            "y": 4758
+        },
+        {
+            "building": "CAMPUS",
+            "floor": 0,
+            "id": "CAMPUS_0_NODE_207",
+            "isPortal": false,
+            "neighbors": [
+                "CAMPUS_0_NODE_210",
+                "CAMPUS_0_NODE_213",
+                "CAMPUS_0_NODE_215"
+            ],
+            "x": 4788,
+            "y": 4639
+        },
+        {
+            "building": "CAMPUS",
+            "floor": 0,
+            "id": "CAMPUS_0_NODE_208",
+            "isPortal": false,
+            "neighbors": [
+                "CAMPUS_0_NODE_218",
+                "CAMPUS_0_NODE_211",
+                "CAMPUS_0_NODE_203",
+                "CAMPUS_0_NODE_213"
+            ],
+            "x": 4577,
+            "y": 4642
+        },
+        {
+            "building": "CAMPUS",
+            "floor": 0,
+            "id": "CAMPUS_0_NODE_209",
+            "isPortal": false,
+            "neighbors": [
+                "CAMPUS_0_NODE_219",
+                "CAMPUS_0_NODE_211",
+                "CAMPUS_0_NODE_212"
+            ],
+            "x": 4580,
+            "y": 4734
+        },
+        {
+            "building": "CAMPUS",
+            "floor": 0,
+            "id": "CAMPUS_0_NODE_210",
+            "isPortal": false,
+            "neighbors": [
+                "CAMPUS_0_NODE_212",
+                "CAMPUS_0_NODE_203",
+                "CAMPUS_0_NODE_207",
+                "CAMPUS_0_NODE_213",
+                "CAMPUS_0_NODE_206",
+                "CAMPUS_0_NODE_214",
+                "CAMPUS_0_NODE_204",
+                "CAMPUS_0_NODE_215"
+            ],
+            "x": 4782,
+            "y": 4694
+        },
+        {
+            "building": "CAMPUS",
+            "floor": 0,
+            "id": "CAMPUS_0_NODE_211",
+            "isPortal": false,
+            "neighbors": [
+                "CAMPUS_0_NODE_218",
+                "CAMPUS_0_NODE_202",
+                "CAMPUS_0_NODE_219",
+                "CAMPUS_0_NODE_208",
+                "CAMPUS_0_NODE_203",
+                "CAMPUS_0_NODE_209",
+                "CAMPUS_0_NODE_212"
+            ],
+            "x": 4576,
+            "y": 4687
+        },
+        {
+            "building": "CAMPUS",
+            "floor": 0,
+            "id": "CAMPUS_0_NODE_212",
+            "isPortal": false,
+            "neighbors": [
+                "CAMPUS_0_NODE_211",
+                "CAMPUS_0_NODE_209",
+                "CAMPUS_0_NODE_203",
+                "CAMPUS_0_NODE_206",
+                "CAMPUS_0_NODE_210"
+            ],
+            "x": 4672,
+            "y": 4741
+        },
+        {
+            "building": "CAMPUS",
+            "floor": 0,
+            "id": "CAMPUS_0_NODE_213",
+            "isPortal": false,
+            "neighbors": [
+                "CAMPUS_0_NODE_208",
+                "CAMPUS_0_NODE_210",
+                "CAMPUS_0_NODE_203",
+                "CAMPUS_0_NODE_207"
+            ],
+            "x": 4673,
+            "y": 4636
+        },
+        {
+            "building": "CAMPUS",
+            "floor": 0,
+            "id": "CAMPUS_0_NODE_214",
+            "isPortal": false,
+            "neighbors": [
+                "CAMPUS_0_NODE_210",
+                "CAMPUS_0_NODE_204",
+                "CAMPUS_0_NODE_206",
+                "CAMPUS_0_NODE_217"
+            ],
+            "x": 4891,
+            "y": 4749
+        },
+        {
+            "building": "CAMPUS",
+            "floor": 0,
+            "id": "CAMPUS_0_NODE_215",
+            "isPortal": false,
+            "neighbors": [
+                "CAMPUS_0_NODE_210",
+                "CAMPUS_0_NODE_207",
+                "CAMPUS_0_NODE_204",
+                "CAMPUS_0_NODE_216"
+            ],
+            "x": 4892,
+            "y": 4639
+        },
+        {
+            "building": "CAMPUS",
+            "floor": 0,
+            "id": "CAMPUS_0_NODE_216",
+            "isPortal": false,
+            "neighbors": [
+                "CAMPUS_0_NODE_204",
+                "CAMPUS_0_NODE_215",
+                "CAMPUS_0_NODE_205"
+            ],
+            "x": 4999,
+            "y": 4639
+        },
+        {
+            "building": "CAMPUS",
+            "floor": 0,
+            "id": "CAMPUS_0_NODE_217",
+            "isPortal": false,
+            "neighbors": [
+                "CAMPUS_0_NODE_204",
+                "CAMPUS_0_NODE_205",
+                "CAMPUS_0_NODE_214"
+            ],
+            "x": 5000,
+            "y": 4733
+        },
+        {
+            "building": "CAMPUS",
+            "floor": 0,
+            "id": "CAMPUS_0_NODE_218",
+            "isPortal": false,
+            "neighbors": [
+                "CAMPUS_0_NODE_202",
+                "CAMPUS_0_NODE_211",
+                "CAMPUS_0_NODE_208"
+            ],
+            "x": 4485,
+            "y": 4648
+        },
+        {
+            "building": "CAMPUS",
+            "floor": 0,
+            "id": "CAMPUS_0_NODE_219",
+            "isPortal": false,
+            "neighbors": [
+                "CAMPUS_0_NODE_202",
+                "CAMPUS_0_NODE_209",
+                "CAMPUS_0_NODE_211"
+            ],
+            "x": 4475,
+            "y": 4731
         }
     ]
 }
