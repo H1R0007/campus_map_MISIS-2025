@@ -12,7 +12,14 @@ add_executable(campus_map
     src/Camera/Camera.cpp
     src/map/Graph.cpp
     src/path_finder/path_finder.cpp
- "src/aliases/AliasManager.cpp" "src/map/TransitionManager.cpp" "src/map/GraphManager.cpp" "src/map/MetaLoader.cpp" "src/history/HistoryManager.cpp" "src/Map_Visuality/MapRenderer.cpp" "src/Input/InputHandler.cpp" "src/UI/UIManager.cpp")
+    src/aliases/AliasManager.cpp 
+    src/map/TransitionManager.cpp
+    src/map/GraphManager.cpp
+    src/map/MetaLoader.cpp
+    src/history/HistoryManager.cpp
+    src/Map_Visuality/MapRenderer.cpp
+    src/Input/InputHandler.cpp
+    src/UI/UIManager.cpp)
 
 option(USE_SDL_IMAGE "Use SDL2_image (PNG, JPG, etc.)" ON)
 option(USE_SDL_TTF   "Use SDL2_ttf (fonts)"            ON)
@@ -62,6 +69,21 @@ if (EMSCRIPTEN)
 
 else()
   message(STATUS "Target: Native (Windows)")
+
+  # Unicode case-fold via boost::locale (optional)
+option(ENABLE_BOOST_LOCALE "Enable Unicode case folding (boost::locale)" ON)
+
+if (ENABLE_BOOST_LOCALE)
+    find_package(Boost CONFIG QUIET COMPONENTS locale)
+    if (TARGET Boost::locale)
+        message(STATUS "Boost::locale found -> Unicode case folding enabled")
+        target_link_libraries(campus_map PRIVATE Boost::locale)
+        target_compile_definitions(campus_map PRIVATE ENABLE_UNICODE_FOLD=1)
+    else()
+        message(WARNING "Boost::locale not found, falling back to ASCII lower only")
+    endif()
+endif()
+
   find_package(SDL2 CONFIG REQUIRED)
   if (USE_SDL_IMAGE)
     find_package(SDL2_image CONFIG REQUIRED)
