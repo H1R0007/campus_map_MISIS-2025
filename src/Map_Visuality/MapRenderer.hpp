@@ -1,5 +1,5 @@
 #pragma once
-
+#include "imgui.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
@@ -37,7 +37,9 @@ public:
         bool neighborMode,
         bool lineToolActive,
         const SDL_Point& lineToolStart,
-        const SDL_Point& lineToolEnd
+        const SDL_Point& lineToolEnd,
+        const std::string& selectedFromId,
+        const std::string& selectedToId
     );
 
     // Хелпер для получения размеров отрисованного текста (нужен для InputHandler)

@@ -40,24 +40,26 @@ bool MapRenderer::loadMapTexture(const std::string& path) {
 }
 
 void MapRenderer::renderScene(
-    const Camera& camera, 
-    const GraphManager& graphManager, 
+    const Camera& camera,
+    const GraphManager& graphManager,
     const std::string& currentView,
-    int currentFloor, 
-    const std::string& currentBuilding, 
+    int currentFloor,
+    const std::string& currentBuilding,
     const std::vector<std::string>& currentPath,
-    const Node* hoveredNode, 
-    const std::string& activeNodeId, 
+    const Node* hoveredNode,
+    const std::string& activeNodeId,
     const std::vector<std::string>& pendingNeighbors,
-    const std::string& portalStartNode, 
-    bool devMode, 
-    bool debugDrawNodes, 
-    bool neighborMode, 
-    bool lineToolActive, 
-    const SDL_Point& lineToolStart, 
-    const SDL_Point& lineToolEnd)
+    const std::string& portalStartNode,
+    bool devMode,
+    bool debugDrawNodes,
+    bool neighborMode,
+    bool lineToolActive,
+    const SDL_Point& lineToolStart,
+    const SDL_Point& lineToolEnd,
+    const std::string& selectedFromId,
+    const std::string& selectedToId)
 {
-    // 1. Отрисовка карты
+    // 1. Отрисовка карты (как было)
     if (mapTexture) {
         SDL_Rect mapWorldRect;
         mapWorldRect.w = this->mapSize.x;
@@ -92,10 +94,9 @@ void MapRenderer::renderScene(
         ? graphManager.getCampusNodes()
         : graphManager.getActiveNodes();
 
-    // 2. Отрисовка DEV-элементов (сетка, узлы, рёбра)
-#ifndef __EMSCRIPTEN__
+#ifndef EMSCRIPTEN
+    // 2. DEV-элементы (как было)
     if (devMode) {
-        // Отрисовка сетки
         SDL_SetRenderDrawColor(renderer, 220, 220, 220, 255);
         int winW, winH;
         SDL_GetRendererOutputSize(renderer, &winW, &winH);
@@ -116,20 +117,20 @@ void MapRenderer::renderScene(
             SDL_RenderDrawLine(renderer, scrA.x, scrA.y, scrB.x, scrB.y);
         }
 
-        // Отрисовка рёбер
+        // Рёбра
         SDL_SetRenderDrawColor(renderer, 150, 150, 150, 255);
         for (const auto& [id, node] : nodesToRender) {
             SDL_Point src = camera.worldToScreen({ node.x, node.y });
             for (const auto& nbId : node.neighbors) {
                 const Node* nbPtr = graphManager.getNode(nbId);
-                if (nbPtr && id < nbId) { // id < nbId чтобы не рисовать ребро дважды
+                if (nbPtr && id < nbId) {
                     SDL_Point dst = camera.worldToScreen({ nbPtr->x, nbPtr->y });
                     SDL_RenderDrawLine(renderer, src.x, src.y, dst.x, dst.y);
                 }
             }
         }
 
-        // Рёбра в режиме добавления соседей
+        // pendingNeighbors (как было)
         if (neighborMode && !activeNodeId.empty()) {
             const Node* activeNode = graphManager.getNode(activeNodeId);
             if (activeNode) {
@@ -145,7 +146,7 @@ void MapRenderer::renderScene(
             }
         }
 
-        // Подсветка начального узла для создания портала
+        // portalStartNode (как было)
         if (!portalStartNode.empty()) {
             const Node* p = graphManager.getNode(portalStartNode);
             if (p) {
@@ -156,20 +157,19 @@ void MapRenderer::renderScene(
             }
         }
 
-        // Отрисовка узлов
+        // Узлы (как было)
         if (debugDrawNodes) {
             for (const auto& [id, node] : nodesToRender) {
                 SDL_Point scr = camera.worldToScreen({ node.x, node.y });
                 SDL_Rect rect{ scr.x - 3, scr.y - 3, 6, 6 };
                 if (neighborMode && !activeNodeId.empty() && id == activeNodeId) {
-                    SDL_SetRenderDrawColor(renderer, 0, 200, 0, 255); // Активный для соседей - зеленый
+                    SDL_SetRenderDrawColor(renderer, 0, 200, 0, 255);
                 }
                 else {
-                    SDL_SetRenderDrawColor(renderer, 200, 0, 0, 255); // Остальные - красные
+                    SDL_SetRenderDrawColor(renderer, 200, 0, 0, 255);
                 }
                 SDL_RenderFillRect(renderer, &rect);
 
-                // Подсветка при наведении (hover)
                 if (hoveredNode && hoveredNode->id == id) {
                     SDL_SetRenderDrawColor(renderer, 0, 0, 200, 255);
                     SDL_Rect border{ scr.x - 5, scr.y - 5, 10, 10 };
@@ -181,27 +181,76 @@ void MapRenderer::renderScene(
     }
 #endif
 
-    // 3. Отрисовка построенного пути
+    // 3. Путь (как было, через ImGui drawlist)
     if (!currentPath.empty()) {
-        SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Синий цвет для пути
-        for (size_t i = 1; i < currentPath.size(); i++) {
+        ImDrawList* drawList = ImGui::GetBackgroundDrawList();
+
+        ImU32 color = IM_COL32(55, 235, 255, 255);
+        float thickness = 5.0f;
+        float radius = thickness * 0.5f;
+
+        for (size_t i = 1; i < currentPath.size(); ++i) {
             const Node* from = graphManager.getNode(currentPath[i - 1]);
             const Node* to = graphManager.getNode(currentPath[i]);
             if (!from || !to) continue;
 
             bool shouldDraw = false;
             if (currentView == "campus") {
-                if (from->building == "CAMPUS" && to->building == "CAMPUS") shouldDraw = true;
+                if (from->building == "CAMPUS" && to->building == "CAMPUS")
+                    shouldDraw = true;
             }
-            else { // BuildingFloor
-                if (from->building == currentBuilding && to->building == currentBuilding && from->floor == currentFloor) shouldDraw = true;
+            else {
+                if (from->building == currentBuilding &&
+                    to->building == currentBuilding &&
+                    from->floor == currentFloor)
+                    shouldDraw = true;
             }
 
             if (shouldDraw) {
                 SDL_Point scrA = camera.worldToScreen({ from->x, from->y });
                 SDL_Point scrB = camera.worldToScreen({ to->x, to->y });
-                SDL_RenderDrawLine(renderer, scrA.x, scrA.y, scrB.x, scrB.y);
+
+                ImVec2 a(scrA.x, scrA.y);
+                ImVec2 b(scrB.x, scrB.y);
+
+                drawList->AddLine(a, b, color, thickness);
+                drawList->AddCircleFilled(a, radius, color);
+                drawList->AddCircleFilled(b, radius, color);
             }
+        }
+    }
+
+    // 4. Маркеры начала/конца маршрута (USER mode)
+    if (!devMode) {
+        auto shouldDrawNodeHere = [&](const Node* n) -> bool {
+            if (!n) return false;
+            if (currentView == "campus") {
+                return n->building == "CAMPUS";
+            }
+            else {
+                return (n->building == currentBuilding && n->floor == currentFloor);
+            }
+            };
+
+        ImDrawList* drawList = ImGui::GetForegroundDrawList();
+        auto drawMarker = [&](const Node* n, ImU32 colFill, ImU32 colOutline) {
+            if (!n) return;
+            SDL_Point p = camera.worldToScreen({ n->x, n->y });
+            ImVec2 c((float)p.x, (float)p.y);
+            float r = 10.0f; // можно масштабировать от зума при желании
+            drawList->AddCircleFilled(c, r, colFill, 32);
+            drawList->AddCircle(c, r, colOutline, 32, 2.0f);
+            drawList->AddCircleFilled(c, 3.0f, IM_COL32(255, 255, 255, 230), 16);
+            };
+
+        const Node* from = selectedFromId.empty() ? nullptr : graphManager.getNode(selectedFromId);
+        const Node* to = selectedToId.empty() ? nullptr : graphManager.getNode(selectedToId);
+
+        if (from && shouldDrawNodeHere(from)) {
+            drawMarker(from, IM_COL32(30, 180, 90, 200), IM_COL32(15, 120, 60, 255));
+        }
+        if (to && shouldDrawNodeHere(to)) {
+            drawMarker(to, IM_COL32(230, 60, 70, 200), IM_COL32(190, 30, 40, 255));
         }
     }
 }
