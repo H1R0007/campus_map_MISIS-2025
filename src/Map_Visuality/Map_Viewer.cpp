@@ -46,27 +46,15 @@ void MapViewer::render() {
 
     SDL_Renderer* r = mapRenderer->getRenderer();
 
+    // Анимация плавного фокуса камеры (если активна)
+    {
+        ImGuiIO& io = ImGui::GetIO();
+        updateCameraFocus(io.DeltaTime);
+    }
+
     // Цвет фона
     SDL_SetRenderDrawColor(r, 10, 15, 25, 255); // тёмно‑синий фон
     SDL_RenderClear(r);
-
-    // Параметры сетки
-    const int gridStep = 100;             // шаг сетки в пикселях
-    const SDL_Color gridColor = { 0, 174, 255, 15 }; // rgb с альфой ≈0.06
-    int w = Config::CANVAS_WIDTH;
-    int h = Config::CANVAS_HEIGHT;
-
-    // Включаем полупрозрачное рисование
-    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(r, gridColor.r, gridColor.g, gridColor.b, gridColor.a);
-
-    // Вертикальные линии
-    for (int x = 0; x < w; x += gridStep)
-        SDL_RenderDrawLine(r, x, 0, x, h);
-
-    // Горизонтальные линии
-    for (int y = 0; y < h; y += gridStep)
-        SDL_RenderDrawLine(r, 0, y, w, y);
 
     std::string viewStr = (currentView == ViewMode::Campus) ? "campus" : "floor";
     mapRenderer->renderScene(
@@ -85,7 +73,9 @@ void MapViewer::render() {
         neighborMode,
         lineToolActive && lineToolFirstPointSet, // Рисуем только если первая точка установлена
         lineToolStart,
-        lineToolEnd
+        lineToolEnd,
+        resolvedFromId,
+        resolvedToId
     );
 }
 
@@ -197,11 +187,108 @@ void MapViewer::createNodeLine(const SDL_Point& startWorld, float angleDeg, int 
 }
 
 void MapViewer::updateSuggestions() {
-    // Determine the currently active input string
-    std::string& currentInput = editingFrom ? inputFrom : inputTo;
+    // 1) Текущий активный ввод (из какого поля читаем подсказки)
+    std::string& activeInput = editingFrom ? inputFrom : inputTo;
 
-    currentSuggestions.clear();
-    if (!currentInput.empty()) {
-        currentSuggestions = aliasManager.suggest(currentInput, 3);
+    // 2) Всегда поддерживаем resolvedFromId/resolvedToId (это дёшево)
+    auto resolveToId = [&](const std::string& text) -> std::string {
+        if (text.empty()) return "";
+        // Сначала через алиасы
+        std::string id = aliasManager.resolve(text);
+        if (!id.empty()) return id;
+        // Потом — если ввели прямой id
+        if (graphManager.getNode(text)) return text;
+        return "";
+        };
+    resolvedFromId = resolveToId(inputFrom);
+    resolvedToId = resolveToId(inputTo);
+
+    // 3) Пересчитываем подсказки только когда строка реально изменилась
+    bool needRecompute = false;
+    if (editingFrom) {
+        if (activeInput != lastSuggestFrom) {
+            lastSuggestFrom = activeInput;
+            needRecompute = true;
+        }
     }
+    else {
+        if (activeInput != lastSuggestTo) {
+            lastSuggestTo = activeInput;
+            needRecompute = true;
+        }
+    }
+
+    if (needRecompute) {
+        currentSuggestions.clear();
+        if (!activeInput.empty()) {
+            currentSuggestions = aliasManager.suggest(activeInput, 3);
+        }
+    }
+
+    // 4) Мягкое авто‑наведение камеры на резолвнутый маркер (только USER режим)
+    bool allowAutoFocus =
+#ifdef EMSCRIPTEN
+        true;                // в вебе — всегда включаем (мягко и ненавязчиво)
+#else
+        !Config::DEV_MODE;   // на десктопе — только в USER режиме
+#endif
+
+    if (allowAutoFocus) {
+        const std::string& curId = editingFrom ? resolvedFromId : resolvedToId;
+        const std::string& prevId = editingFrom ? prevResolvedFromId : prevResolvedToId;
+        if (!curId.empty() && curId != prevId) {
+            requestFocusToNode(curId, 0.28f);
+        }
+    }
+
+    // 5) Обновляем "предыдущие" значения для де‑баунса фокуса
+    prevResolvedFromId = resolvedFromId;
+    prevResolvedToId = resolvedToId;
+}
+
+void MapViewer::requestFocusToNode(const std::string& nodeId, float durationSec) {
+    if (Config::DEV_MODE) return; // только для USER режима
+
+    const Node* n = graphManager.getNode(nodeId);
+    if (!n) return;
+
+    // Проверим видимость на текущем представлении
+    bool visible = false;
+    if (currentView == ViewMode::Campus) {
+        visible = (n->building == "CAMPUS");
+    }
+    else {
+        visible = (n->building == currentBuilding && n->floor == currentFloor);
+    }
+    if (!visible) return;
+
+    // Текущий центр камеры в мировых координатах
+    SDL_Point curC = camera.getCenterWorld();
+    SDL_FPoint start{ (float)curC.x, (float)curC.y };
+    SDL_FPoint target{ (float)n->x, (float)n->y };
+
+    // Если уже почти в цели — не дёргаем
+    float dx = target.x - start.x;
+    float dy = target.y - start.y;
+    if ((dx * dx + dy * dy) < 9.0f) return;
+
+    focusAnim.active = true;
+    focusAnim.start = start;
+    focusAnim.target = target;
+    focusAnim.t = 0.f;
+    focusAnim.duration = std::max(0.12f, durationSec); // защита от слишком коротких значений
+}
+
+void MapViewer::updateCameraFocus(float dt) {
+    if (!focusAnim.active) return;
+    focusAnim.t += dt;
+    float a = std::min(focusAnim.t / focusAnim.duration, 1.0f);
+    // ease-out: 1 - (1 - a)^3
+    float u = 1.0f - (1.0f - a) * (1.0f - a) * (1.0f - a);
+    SDL_FPoint cur{
+        focusAnim.start.x + (focusAnim.target.x - focusAnim.start.x) * u,
+        focusAnim.start.y + (focusAnim.target.y - focusAnim.start.y) * u
+    };
+    camera.setCenterWorld(SDL_Point{ (int)std::lround(cur.x), (int)std::lround(cur.y) });
+    if (a >= 1.0f) focusAnim.active = false;
 }

@@ -8,6 +8,7 @@
 #include "../path_finder/path_finder.hpp"
 #include "../aliases/AliasManager.hpp"
 #include "../map/GraphManager.hpp"
+#include "imgui.h"
 
 // Вперед объявляем классы-помощники
 class MapRenderer;
@@ -64,17 +65,7 @@ public:
     const std::string& getNeighborModeActiveId() const { return activeNodeId; }
     bool isNeighborModeActive() const { return neighborMode; }
     Uint32 getLastSaveTick() const { return lastSaveTick; }
-
-   /* bool isTransitionActive() const { return transitionActive; }
-    float getTransitionProgress() const {
-        if (!transitionActive) return 0.0f;
-        float elapsed = (SDL_GetTicks() - transitionStart) / 1000.0f;
-        return std::min(elapsed / 0.6f, 1.0f);
-    }
-    void completeTransition() { transitionActive = false; transitionAlpha = 0.0f; targetMapPath.clear(); }
-    const std::string& getTargetMapPath() const { return targetMapPath; }
-    void loadTargetMap() { if (!targetMapPath.empty()) loadMap(targetMapPath); }
-    SDL_Renderer* getRenderer();*/
+    bool& getDebugDrawNodes() { return debugDrawNodes; }
 
     // Setters and getters for UI state
     void setEditingFrom(bool isEditingFrom) { editingFrom = isEditingFrom; }
@@ -85,6 +76,9 @@ public:
 
     // Метод для обновления подсказок, который будет вызываться каждый кадр
     void updateSuggestions();
+
+    void requestFocusToNode(const std::string& nodeId, float durationSec = 0.28f);
+    void updateCameraFocus(float dt);
 
 private:
     // Даем классам-помощникам доступ к приватному состоянию этого класса
@@ -134,18 +128,33 @@ private:
     bool inputActive = false;
     SDL_Rect fromFieldRect{}, toFieldRect{}; // Области для кликов по полям ввода
     Uint32 lastSaveTick = 0;
+    
+    // Выбранные/разрешённые узлы для визуальных маркеров (user mode)
+    std::string resolvedFromId;
+    std::string resolvedToId;
+
+    // Для авто-наведения (debounce)
+    std::string prevResolvedFromId;
+    std::string prevResolvedToId;
+
+    // Кэш последнего текста для подсказок (чтобы не пересчитывать каждый кадр)
+    std::string lastSuggestFrom;
+    std::string lastSuggestTo;
+
+    // Анимация фокуса камеры
+    struct FocusAnim {
+        bool active = false;
+        SDL_FPoint start{ 0.f, 0.f };
+        SDL_FPoint target{ 0.f, 0.f };
+        float t = 0.f;
+        float duration = 0.28f; // секунды
+    } focusAnim;
 
     // --- Настройки пользователя и отладки ---
     bool userAllowStairs = true;
     bool userAllowLift = true;
     bool userAllowBridge = true;
     bool debugDrawNodes = true; // Показывать/скрывать узлы в DEV-режиме
-
-    // --- Плавные переходы между этажами/корпусами ---
-    /*bool transitionActive = false;
-    float transitionAlpha = 0.0f;
-    Uint32 transitionStart = 0;
-    std::string targetMapPath;*/
 
     // --- Приватные хелперы, используемые внутри класса ---
     void loadMap(const std::string& path);

@@ -1,5 +1,6 @@
 #pragma once
 #include <SDL2/SDL.h>
+#include <algorithm>
 #include "../config.hpp"
 
 // === Zoom behavior modes ===
@@ -34,6 +35,10 @@ public:
     // === Accessors ===
     const SDL_Rect& getViewport() const { return viewport; }
     float getScale() const { return scale; }
+
+    // === Center helpers (world space) ===
+    SDL_Point getCenterWorld() const;
+    void setCenterWorld(const SDL_Point& c);
 
 private:
     // === Internal state ===

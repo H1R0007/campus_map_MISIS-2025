@@ -1,5 +1,4 @@
 ﻿#include "Camera.hpp"
-#include <algorithm>
 #include <cmath>
 
 // === Constructor ===
@@ -122,4 +121,16 @@ void Camera::clampViewport() {
     else {
         viewport.y = clampVal(viewport.y, -padY, scaledH - viewport.h + padY);
     }
+}
+
+SDL_Point Camera::getCenterWorld() const {
+    int cx = static_cast<int>(viewport.x / scale + (viewport.w * 0.5f) / scale);
+    int cy = static_cast<int>(viewport.y / scale + (viewport.h * 0.5f) / scale);
+    return { cx, cy };
+}
+
+void Camera::setCenterWorld(const SDL_Point& c) {
+    viewport.x = static_cast<int>(c.x * scale - (viewport.w * 0.5f));
+    viewport.y = static_cast<int>(c.y * scale - (viewport.h * 0.5f));
+    clampViewport();
 }
