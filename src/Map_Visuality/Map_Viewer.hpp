@@ -77,7 +77,13 @@ public:
     // Метод для обновления подсказок, который будет вызываться каждый кадр
     void updateSuggestions();
 
-    void requestFocusToNode(const std::string& nodeId, float durationSec = 0.28f);
+    void requestFocusToNode(const std::string& nodeId, float durationSec = 0.28f, bool force = false);
+
+    void focusNodeByIdSmart(const std::string& idOrAlias,
+        bool switchViewIfNeeded = true,
+        bool adjustZoom = false,
+        float targetZoom = 1.15f);
+
     void updateCameraFocus(float dt);
 
 private:

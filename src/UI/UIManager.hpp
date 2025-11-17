@@ -1,19 +1,18 @@
 #pragma once
 #include <SDL2/SDL_image.h>
+#include "imgui.h"
 #include <string>
+#include <vector>
 
-// Forward-declare
 class MapViewer;
 
 class UIManager {
 public:
     UIManager();
 
-    // The main function to draw the entire UI for a frame.
-    // It takes a reference to MapViewer to get data and call its methods.
     void render(MapViewer& mapViewer);
-
     void setLogoTexture(SDL_Texture* tex) { logoTexture = tex; }
+
 private:
     struct AutoCompleteState {
         bool active = false;
@@ -21,26 +20,35 @@ private:
         int hovered = -1;
     } autoState;
 
-    // Локальное состояние UI
+    // UI state
     SDL_Texture* logoTexture = nullptr;
 
-    // Состояние объединённой панели маршрута
-    bool routePanelExpanded = false;   // Свернуто по умолчанию (только "Откуда")
+    // Route panel state
+    bool routePanelExpanded = false;
 
     // Dev dock state (DEV only)
     bool devToolsVisible = true;
     bool devToolsMini = false;
-    bool devDemoOpen = false; // опционально ImGui Demo
+    bool devDemoOpen = false;
 
-    // Private methods to draw specific UI windows for better organization
-    void drawSearchWindow(MapViewer& mapViewer); // объединённая панель
-    void drawDevInfoWindow(MapViewer& mapViewer);
+    // Toasts (ненавязчивая обратная связь)
+    struct Toast {
+        std::string text;
+        ImVec4 color;
+        float ttl;   // сек
+        float age;   // сек
+    };
+    std::vector<Toast> toasts;
+    void pushToast(const std::string& txt, ImVec4 col = ImVec4(0.06f, 0.60f, 1.0f, 1.0f), float duration = 1.8f);
+    void drawToasts();
+
+    // Windows
+    void drawSearchWindow(MapViewer& mapViewer);
     void drawTopNavBar(MapViewer& viewer);
-    void drawRightPanel(MapViewer& viewer);
     void drawFloorBuildingPanel(MapViewer& mapViewer);
     void drawBottomMenuBar(MapViewer& viewer);
+    void drawLogoOverlay();
 
-    // New: compact developer dock + its always-available toggle button
+    // Dev Dock
     void drawDevDock(MapViewer& viewer);
-    void drawDevDockToggleButton();
 };

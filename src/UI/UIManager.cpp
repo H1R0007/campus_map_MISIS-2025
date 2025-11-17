@@ -66,8 +66,7 @@ void UIManager::render(MapViewer& viewer) {
     }
 #endif
 
-    // --- Шапка (по центру) ---
-    drawTopNavBar(viewer);
+    drawLogoOverlay();
 
     // --- Объединённое окно маршрута: слева, вровень по Oy с логотипом ---
     drawSearchWindow(viewer);
@@ -82,26 +81,36 @@ void UIManager::render(MapViewer& viewer) {
     // Компактный Dev Dock
     if (Config::DEV_MODE && devToolsVisible) {
         drawDevDock(viewer);
-        // Всегда доступная плавающая кнопка-развёртка (на случай, если мини-окно слишком компактное)
-        if (devToolsMini) drawDevDockToggleButton();
     }
 #endif
+    drawToasts();
 }
 
 // === Объединённое окно маршрута (компактное) ===
 void UIManager::drawSearchWindow(MapViewer& mapViewer) {
     ImGuiIO& io = ImGui::GetIO();
+    ImGuiStyle& st = ImGui::GetStyle();
 
-    // Адаптивная ширина: компактная, но читаемая
+    // — геометрия и адаптив —
     float screenW = io.DisplaySize.x;
-    float panelW = std::clamp(screenW * 0.26f, 260.0f, 340.0f); // ~30% уже прежних 400
-    float panelH_collapsed = 90.0f;  // только "Откуда"
-    float panelH_expanded = 190.0f; // "Откуда", "Куда", кнопка
+    float panelW = std::clamp(screenW * 0.26f, 260.0f, 340.0f); // компактная ширина
+    const float PAD = 16.0f;
+
+    // параметры “шапки” внутри окна
+    const float headerY = 10.0f;
+    const float headerH = 28.0f;
+    const float frameH = ImGui::GetFrameHeight(); // высота поля ввода
+    const float spacingY = st.ItemSpacing.y * 1.10f + 4.0f; // +10% вертикального отступа
+
+    // посчитаем высоты окна для режимов
+    float collapsedH = headerY + headerH + 6.0f + frameH + PAD; // заголовок + одно поле + паддинг
+    float buttonH = 34.0f;
+    float expandedH = headerY + headerH + 6.0f + frameH + spacingY + frameH + spacingY + buttonH + PAD;
 
     float X = 20.0f;
-    float Y = Layout::TOP_MARGIN;    // вровень с логотипом
+    float Y = Layout::TOP_MARGIN;
     float W = panelW;
-    float H = routePanelExpanded ? panelH_expanded : panelH_collapsed;
+    float H = (routePanelExpanded ? expandedH : collapsedH);
 
     ImGui::SetNextWindowPos(ImVec2(X, Y));
     ImGui::SetNextWindowSize(ImVec2(W, H));
@@ -116,7 +125,7 @@ void UIManager::drawSearchWindow(MapViewer& mapViewer) {
         ImVec2 winPos = ImGui::GetWindowPos();
         ImVec2 winSize = ImGui::GetWindowSize();
 
-        // Фон + рамка
+        // фон + рамка карточки
         const float RADIUS = 12.0f;
         ImVec4 bg = ImVec4(1.0f, 1.0f, 1.0f, 0.96f);
         ImVec4 border = ImVec4(0.82f, 0.84f, 0.85f, 1.0f);
@@ -125,27 +134,34 @@ void UIManager::drawSearchWindow(MapViewer& mapViewer) {
         dl->AddRect(winPos, ImVec2(winPos.x + winSize.x, winPos.y + winSize.y),
             ImGui::GetColorU32(border), RADIUS, 0, 1.2f);
 
-        // Заголовок
-        ImGui::SetCursorPos(ImVec2(16, 10));
+        // Заголовок слева
+        ImGui::SetCursorPos(ImVec2(PAD, headerY));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.05f, 0.25f, 0.65f, 1.0f));
         ImGui::TextUnformatted(u8"\uf4d7  Маршрут"); // FA "route"
         ImGui::PopStyleColor();
 
-        // Кнопка сворачивания — абсолютная позиция внутри контента (не обрежется)
-        ImVec2 cMin = ImGui::GetWindowContentRegionMin();
-        ImVec2 cMax = ImGui::GetWindowContentRegionMax();
-        const float pad = 6.0f;
-        ImVec2 chevronPos(winPos.x + cMax.x - 24.0f - pad, winPos.y + cMin.y + pad);
-        ImGui::SetCursorScreenPos(chevronPos);
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
-        const char* chevron = routePanelExpanded ? u8"\uf077" : u8"\uf078"; // up/down
-        if (ImGui::Button(chevron, ImVec2(24, 24))) routePanelExpanded = !routePanelExpanded;
-        ImGui::PopStyleVar();
+        // Кнопка сворачивания (chevron) — в правом верхнем углу контента, компактная
+        {
+            const float btnSz = 20.0f;     // компактно как раньше
+            const float pad = 6.0f;
 
-        // Поля ввода
-        std::string& fromStr = mapViewer.getInputFrom();
-        std::string& toStr = mapViewer.getInputTo();
+            ImVec2 cMax = ImGui::GetWindowContentRegionMax();
+            ImVec2 localPos(cMax.x - btnSz - pad, headerY); // локальные координаты
+            ImGui::SetCursorPos(localPos);
 
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
+            const char* label = routePanelExpanded ? u8"\uf077" : u8"\uf078"; // FA up/down
+            if (ImGui::Button(label, ImVec2(btnSz, btnSz))) {
+                routePanelExpanded = !routePanelExpanded;
+                // Мгновенно применяем новый размер — нет «возврата» к сжатому
+                float newH = routePanelExpanded ? expandedH : collapsedH;
+                ImGui::SetWindowSize(ImVec2(W, newH));
+            }
+            ImGui::PopStyleVar(2);
+        }
+
+        // Общий стиль полей
         auto pushFieldStyle = [] {
             ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
             ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.96f, 0.98f, 1.0f, 0.55f));
@@ -156,119 +172,153 @@ void UIManager::drawSearchWindow(MapViewer& mapViewer) {
             ImGui::PopStyleVar();
             };
 
+        // Поля ввода
+        std::string& fromStr = mapViewer.getInputFrom();
+        std::string& toStr = mapViewer.getInputTo();
         ImGui::PushItemWidth(-1);
 
-        // ОТКУДА
+        // ОТКУДА — координаты и рисование
         ImVec2 fromMin, fromMax;
-        ImGui::SetCursorPos(ImVec2(16, 44));
-        pushFieldStyle();
-        bool fromChanged = ImGui::InputTextWithHint("##fromRouteUnified", "Откуда...", &fromStr);
-        popFieldStyle();
-        fromMin = ImGui::GetItemRectMin();
-        fromMax = ImGui::GetItemRectMax();
-        if (ImGui::IsItemActive()) {
-            dl->AddRect(fromMin, fromMax, ImGui::GetColorU32(ImVec4(0.00f, 0.45f, 0.95f, 1.0f)), 6.0f, 0, 2.0f);
-            mapViewer.setEditingFrom(true);
-        }
+        {
+            float y = headerY + headerH + 6.0f;
+            ImGui::SetCursorPos(ImVec2(PAD, y));
+            pushFieldStyle();
+            bool fromChanged = ImGui::InputTextWithHint("##fromRouteUnified", "Откуда...", &fromStr);
+            popFieldStyle();
+            fromMin = ImGui::GetItemRectMin();
+            fromMax = ImGui::GetItemRectMax();
 
-        // СВЕРНУТО: только "Откуда" + разворот по клику + подсказки
-        if (!routePanelExpanded) {
-            bool clickedFromField =
-                ImGui::IsItemClicked(ImGuiMouseButton_Left);
-            bool clickedInsideWindow =
-                ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) &&
-                ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+            // лёгкая рамка фона для неактивного поля (лучше читается на белом)
+            bool fromActive = ImGui::IsItemActive();
+            ImU32 subtle = ImGui::GetColorU32(ImVec4(0.15f, 0.20f, 0.35f, fromActive ? 0.00f : 0.10f));
+            dl->AddRect(fromMin, fromMax, subtle, 6.0f, 0, 1.0f);
 
-            if (clickedFromField || clickedInsideWindow) {
-                routePanelExpanded = true;
+            // активная обводка
+            if (fromActive) {
+                dl->AddRect(fromMin, fromMax,
+                    ImGui::GetColorU32(ImVec4(0.00f, 0.45f, 0.95f, 1.0f)), 6.0f, 0, 2.0f);
+                mapViewer.setEditingFrom(true);
             }
 
-            auto drawSuggestionsPopup = [&](const std::vector<std::string>& s,
-                const ImVec2& fieldMin,
-                const ImVec2& fieldMax) {
-                    if (s.empty()) return;
-                    for (const std::string& v : s) if (v == fromStr) return;
-
-                    const float popupW = 210.0f;
-                    ImGui::SetNextWindowPos(ImVec2(fieldMax.x + 12.0f, fieldMin.y));
-                    ImGui::SetNextWindowSize(ImVec2(popupW, 120.0f));
-                    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
-                    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(1, 1, 1, 0.97f));
-                    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.82f, 0.84f, 0.85f, 1));
-
-                    bool open = true;
-                    if (ImGui::Begin("##RouteSuggestionsCollapsed", &open,
-                        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar |
-                        ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBringToFrontOnFocus))
-                    {
-                        ImGui::Dummy(ImVec2(10, 6));
-                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.05f, 0.25f, 0.65f, 1.0f));
-                        ImGui::SetCursorPosX(12);
-                        ImGui::TextUnformatted(u8"\uf002  Подсказки");
-                        ImGui::PopStyleColor();
-                        ImGui::Dummy(ImVec2(0, 4));
-
-                        const float totalW = popupW - 20.0f;
-                        ImGui::PushItemWidth(totalW);
-                        for (size_t i = 0; i < s.size(); ++i) {
-                            std::string id = s[i] + "##collapsed" + std::to_string(i);
-                            if (ImGui::Selectable(id.c_str(), false, ImGuiSelectableFlags_None, ImVec2(totalW, 24.0f))) {
-                                mapViewer.getInputFrom() = s[i];
-                                mapViewer.setEditingFrom(true);
-                                open = false;
-                                routePanelExpanded = true;
-                            }
-                        }
-                        ImGui::PopItemWidth();
-
-                        if (!ImGui::IsWindowFocused(ImGuiFocusedFlags_AnyWindow) &&
-                            ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-                            open = false;
-                    }
-                    ImGui::End();
-                    ImGui::PopStyleColor(2);
-                    ImGui::PopStyleVar();
-
-                    if (!open) ImGui::SetKeyboardFocusHere(-1);
-                };
-
             if (fromChanged) mapViewer.updateSuggestions();
-            mapViewer.setEditingFrom(true);
-            drawSuggestionsPopup(mapViewer.getCurrentSuggestions(), fromMin, fromMax);
 
-            ImGui::PopItemWidth();
-            ImGui::End();
-            return;
+            // СВЕРНУТО: только "Откуда" + разворот по клику + подсказки
+            if (!routePanelExpanded) {
+                bool clickedFromField = ImGui::IsItemClicked(ImGuiMouseButton_Left);
+                bool clickedInsideWindow =
+                    ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) &&
+                    ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+
+                if (clickedFromField || clickedInsideWindow) {
+                    routePanelExpanded = true;
+                    float newH = expandedH;
+                    ImGui::SetWindowSize(ImVec2(W, newH));
+                }
+
+                // Popup подсказок — ВСЕГДА справа от поля (шапка убрана)
+                auto drawCollapsedSuggestions = [&](const std::vector<std::string>& s,
+                    const ImVec2& fieldMin,
+                    const ImVec2& fieldMax)
+                    {
+                        if (s.empty()) return;
+                        for (const std::string& v : s) if (v == fromStr) return;
+
+                        float popupW = 210.0f;
+                        ImVec2 pos(fieldMax.x + 12.0f, fieldMin.y);
+
+                        ImGui::SetNextWindowPos(pos);
+                        ImGui::SetNextWindowSize(ImVec2(popupW, 120.0f));
+                        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
+                        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(1, 1, 1, 0.97f));
+                        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.82f, 0.84f, 0.85f, 1));
+
+                        bool open = true;
+                        if (ImGui::Begin("##RouteSuggestionsCollapsed", &open,
+                            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                            ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar |
+                            ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBringToFrontOnFocus))
+                        {
+                            ImGui::Dummy(ImVec2(10, 6));
+                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.05f, 0.25f, 0.65f, 1.0f));
+                            ImGui::SetCursorPosX(12);
+                            ImGui::TextUnformatted(u8"\uf002  Подсказки");
+                            ImGui::PopStyleColor();
+                            ImGui::Dummy(ImVec2(0, 4));
+
+                            const float totalW = popupW - 20.0f;
+                            ImGui::PushItemWidth(totalW);
+                            for (size_t i = 0; i < s.size(); ++i) {
+                                std::string id = s[i] + "##collapsed" + std::to_string(i);
+                                if (ImGui::Selectable(id.c_str(), false, ImGuiSelectableFlags_None, ImVec2(totalW, 24.0f))) {
+                                    mapViewer.getInputFrom() = s[i];
+                                    mapViewer.setEditingFrom(true);
+                                    open = false;
+                                    routePanelExpanded = true;
+                                    ImGui::SetWindowSize(ImVec2(W, expandedH));
+                                }
+                            }
+                            ImGui::PopItemWidth();
+
+                            if (!ImGui::IsWindowFocused(ImGuiFocusedFlags_AnyWindow) &&
+                                ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+                                open = false;
+                        }
+                        ImGui::End();
+                        ImGui::PopStyleColor(2);
+                        ImGui::PopStyleVar();
+
+                        if (!open) ImGui::SetKeyboardFocusHere(-1);
+                    };
+
+                mapViewer.setEditingFrom(true);
+                drawCollapsedSuggestions(mapViewer.getCurrentSuggestions(), fromMin, fromMax);
+
+                ImGui::PopItemWidth();
+                ImGui::End();
+                return;
+            }
         }
 
-        // РАЗВЕРНУТО
-        ImGui::Dummy(ImVec2(0, 6));
-
+        // РАЗВЕРНУТО: КУДА
         ImVec2 toMin, toMax;
-        ImGui::SetCursorPos(ImVec2(16, 80));
-        pushFieldStyle();
-        bool toChanged = ImGui::InputTextWithHint("##toRouteUnified", "Куда...", &toStr);
-        popFieldStyle();
-        toMin = ImGui::GetItemRectMin();
-        toMax = ImGui::GetItemRectMax();
-        if (ImGui::IsItemActive()) {
-            dl->AddRect(toMin, toMax, ImGui::GetColorU32(ImVec4(0.00f, 0.45f, 0.95f, 1.0f)), 6.0f, 0, 2.0f);
-            mapViewer.setEditingFrom(false);
+        {
+            float y2 = headerY + headerH + 6.0f + frameH + spacingY;
+            ImGui::SetCursorPos(ImVec2(PAD, y2));
+            pushFieldStyle();
+            bool toChanged = ImGui::InputTextWithHint("##toRouteUnified", "Куда...", &toStr);
+            popFieldStyle();
+            toMin = ImGui::GetItemRectMin();
+            toMax = ImGui::GetItemRectMax();
+
+            bool toActive = ImGui::IsItemActive();
+            ImU32 subtle = ImGui::GetColorU32(ImVec4(0.15f, 0.20f, 0.35f, toActive ? 0.00f : 0.10f));
+            dl->AddRect(toMin, toMax, subtle, 6.0f, 0, 1.0f);
+
+            if (toActive) {
+                dl->AddRect(toMin, toMax,
+                    ImGui::GetColorU32(ImVec4(0.00f, 0.45f, 0.95f, 1.0f)), 6.0f, 0, 2.0f);
+                mapViewer.setEditingFrom(false);
+            }
+
+            if (toChanged) mapViewer.updateSuggestions();
         }
 
-        ImGui::Dummy(ImVec2(0, 8));
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.03f, 0.47f, 1.00f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.10f, 0.55f, 1.00f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.00f, 0.45f, 0.95f, 1.0f));
-        ImGui::SetCursorPos(ImVec2(16, 118));
-        if (ImGui::Button(u8"\uf135  Построить маршрут", ImVec2(W - 32.0f, 34.0f))) {
-            mapViewer.buildPathFromAliases(fromStr, toStr);
+        // Кнопка "Построить маршрут"
+        {
+            float yBtn = toMax.y - ImGui::GetWindowPos().y + spacingY;
+            ImGui::SetCursorPos(ImVec2(PAD, yBtn));
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.03f, 0.47f, 1.00f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.10f, 0.55f, 1.0f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.00f, 0.45f, 0.95f, 1.0f));
+            if (ImGui::Button(u8"\uf135  Построить маршрут", ImVec2(W - PAD * 2.0f, 34.0f))) {
+                mapViewer.buildPathFromAliases(fromStr, toStr);
+            }
+            ImGui::PopStyleColor(3);
+            ImGui::PopStyleVar();
         }
-        ImGui::PopStyleColor(3);
-        ImGui::PopStyleVar();
 
+        // Подсказки — для активного поля, ВСЕГДА справа (шапка снята)
         auto drawSuggestionsPopup = [&](const std::vector<std::string>& sugg,
             const ImVec2& fieldMin,
             const ImVec2& fieldMax,
@@ -278,8 +328,10 @@ void UIManager::drawSearchWindow(MapViewer& mapViewer) {
                 if (sugg.empty()) return;
                 for (const std::string& s : sugg) if (s == fieldText) return;
 
-                const float popupW = 220.0f;
-                ImGui::SetNextWindowPos(ImVec2(fieldMax.x + 12.0f, fieldMin.y));
+                float popupW = std::clamp(W - PAD * 2.0f, 220.0f, 320.0f);
+                ImVec2 pos(fieldMax.x + 12.0f, fieldMin.y);
+
+                ImGui::SetNextWindowPos(pos);
                 ImGui::SetNextWindowSize(ImVec2(popupW, 140.0f));
 
                 ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
@@ -287,7 +339,8 @@ void UIManager::drawSearchWindow(MapViewer& mapViewer) {
                 ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.82f, 0.84f, 0.85f, 1.0f));
 
                 bool open = true;
-                if (ImGui::Begin(forFrom ? "##RouteSuggestionsFromUnified" : "##RouteSuggestionsToUnified", &open,
+                std::string winId = forFrom ? "##RouteSuggestionsFromUnified" : "##RouteSuggestionsToUnified";
+                if (ImGui::Begin(winId.c_str(), &open,
                     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                     ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
                     ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoFocusOnAppearing |
@@ -300,12 +353,10 @@ void UIManager::drawSearchWindow(MapViewer& mapViewer) {
                     ImGui::PopStyleColor();
                     ImGui::Dummy(ImVec2(0, 4));
 
-                    const float totalW = popupW - 20.0f;
-                    ImGui::PushItemWidth(totalW);
+                    ImGui::PushItemWidth(popupW - 20.0f);
                     for (size_t i = 0; i < sugg.size(); ++i) {
-                        std::string id = sugg[i] + "##" + std::to_string(i) +
-                            (forFrom ? "##from" : "##to");
-                        if (ImGui::Selectable(id.c_str(), false, ImGuiSelectableFlags_None, ImVec2(totalW, 24.0f))) {
+                        std::string id = sugg[i] + "##" + std::to_string(i) + (forFrom ? "##from" : "##to");
+                        if (ImGui::Selectable(id.c_str(), false, ImGuiSelectableFlags_None, ImVec2(popupW - 20.0f, 24.0f))) {
                             if (forFrom) {
                                 mapViewer.getInputFrom() = sugg[i];
                                 mapViewer.setEditingFrom(true);
@@ -330,7 +381,7 @@ void UIManager::drawSearchWindow(MapViewer& mapViewer) {
                 if (!open) ImGui::SetKeyboardFocusHere(-1);
             };
 
-        if (fromChanged || toChanged) mapViewer.updateSuggestions();
+        // актуализируем подсказки (MapViewer сам оптимизирует перерасчёт)
         if (mapViewer.isEditingFrom())
             drawSuggestionsPopup(mapViewer.getCurrentSuggestions(), fromMin, fromMax, true, fromStr);
         else
@@ -519,125 +570,38 @@ void UIManager::drawFloorBuildingPanel(MapViewer& mapViewer) {
     ImGui::End();
 }
 
-// === Компактная верхняя панель MISIS — финальный вариант ===
-void UIManager::drawTopNavBar(MapViewer& viewer) {
+void UIManager::drawLogoOverlay() {
+    if (!logoTexture) return;
+
     ImGuiIO& io = ImGui::GetIO();
-    float screenW = io.DisplaySize.x;
+    ImDrawList* dl = ImGui::GetForegroundDrawList();
 
-    // Базовые параметры адаптивного окна
-    constexpr float PANEL_H_BASE = 90.0f;
-    constexpr float SHRINK_Y = 0.8f;
-    constexpr float EXPAND_X = 1.2f;
-    constexpr float LOGO_MAX_H = 68.0f;
-    constexpr float BTN_SIZE = 36.0f;
+    // Размер логотипа — прежний по высоте (не уменьшать)
+    int tw = 0, th = 0;
+    SDL_QueryTexture(logoTexture, nullptr, nullptr, &tw, &th);
+    if (tw <= 0 || th <= 0) return;
 
-    // ширина панели от реального логотипа
-    float baseW = 320.0f;
-    if (logoTexture) {
-        int w, h;
-        SDL_QueryTexture(logoTexture, nullptr, nullptr, &w, &h);
-        if (w > 0 && h > 0)
-            baseW = static_cast<float>(w) * (LOGO_MAX_H / h) + 120.0f;
-    }
+    const float LOGO_H = 68.0f; // как в шапке
+    float scale = LOGO_H / static_cast<float>(th);
+    ImVec2 size(static_cast<float>(tw) * scale, LOGO_H);
 
-    float panelW = baseW * EXPAND_X;
-    float panelH = PANEL_H_BASE * SHRINK_Y;
-    float panelX = (screenW - panelW) * 0.5f;
-    float panelY = Layout::TOP_MARGIN; // выравниваем по Oy
+    // Позиция — топ‑центр, с небольшим отступом сверху
+    const float topPad = Layout::TOP_MARGIN; // 20
+    ImVec2 pos((io.DisplaySize.x - size.x) * 0.5f, topPad);
 
-    ImGui::SetNextWindowPos(ImVec2(panelX, panelY), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(panelW, panelH), ImGuiCond_Always);
-    ImGui::SetNextWindowBgAlpha(0.96f);
+    // Лёгкая подложка‑тень для читаемости на светлой карте
+    ImU32 bg = ImGui::GetColorU32(ImVec4(1, 1, 1, 0.85f));
+    ImU32 bd = ImGui::GetColorU32(ImVec4(0.82f, 0.84f, 0.85f, 1.0f));
+    ImVec2 p1 = pos;
+    ImVec2 p2 = ImVec2(pos.x + size.x, pos.y + size.y);
 
-    if (ImGui::Begin("TopBarMISIS_Compact", nullptr,
-        ImGuiWindowFlags_NoTitleBar |
-        ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoMove |
-        ImGuiWindowFlags_NoScrollbar |
-        ImGuiWindowFlags_NoScrollWithMouse |
-        ImGuiWindowFlags_NoCollapse))
-    {
-        ImDrawList* dl = ImGui::GetWindowDrawList();
-        ImVec2 pos = ImGui::GetWindowPos();
-        ImVec2 size = ImGui::GetWindowSize();
+    // Подложку можно отключить, если хочется «чистый» логотип
+    // dl->AddRectFilled(p1, p2, bg, 10.0f);
+    // dl->AddRect(p1, p2, bd, 10.0f, 0, 1.5f);
 
-        const float RADIUS = 12.0f;
-        ImVec4 bgColor = ImVec4(1.0f, 1.0f, 1.0f, 0.96f);
-        ImVec4 borderColor = ImVec4(0.82f, 0.84f, 0.85f, 1.0f);
-
-        dl->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y),
-            ImGui::GetColorU32(bgColor), RADIUS);
-        dl->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y),
-            ImGui::GetColorU32(borderColor), RADIUS, 0, 1.6f);
-
-        float centerY = pos.y + size.y * 0.5f;
-
-        // Логотип
-        if (logoTexture) {
-            int tw, th;
-            SDL_QueryTexture(logoTexture, nullptr, nullptr, &tw, &th);
-            float scale = LOGO_MAX_H / static_cast<float>(th);
-            ImVec2 logoSize(tw * scale, th * scale);
-            float logoY = centerY - logoSize.y * 0.5f;
-            ImGui::SetCursorScreenPos(ImVec2(pos.x + 18.0f, logoY));
-            ImGui::Image((ImTextureID)(intptr_t)logoTexture, logoSize);
-        }
-        else {
-            ImGui::SetCursorScreenPos(ImVec2(pos.x + 20.0f, centerY - 10.0f));
-            ImGui::TextColored(ImVec4(0.0f, 0.35f, 0.75f, 1.0f), "MISIS");
-        }
-
-        // Решаем, показывать ли fullscreen на этом устройстве
-#ifdef EMSCRIPTEN
-        const bool showFullscreen = false;
-#else
-        const bool showFullscreen = (io.DisplaySize.x >= 1000.0f && io.DisplaySize.y >= 650.0f);
-#endif
-
-        int btnCount = showFullscreen ? 3 : 2; // добавили шестерёнку
-        float totalBtnW = BTN_SIZE * btnCount + (btnCount - 1) * 14.0f;
-
-        float btnStartX = pos.x + size.x - totalBtnW - 16.0f;
-        float btnY = centerY - BTN_SIZE * 0.5f;
-
-        ImGui::SetCursorScreenPos(ImVec2(btnStartX, btnY));
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.94f, 0.96f, 1.0f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.88f, 0.91f, 1.0f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.82f, 0.86f, 1.0f, 1.0f));
-
-        // 🌐 (FA: \uf1ab)
-        if (ImGui::Button(u8"\uf1ab", ImVec2(BTN_SIZE, BTN_SIZE))) {
-            SDL_Log("[UI] Language switch clicked");
-        }
-
-        // ⚙️ Dev Dock (только в DEV)
-#ifndef EMSCRIPTEN
-        if (Config::DEV_MODE) {
-            ImGui::SameLine(0, 14.0f);
-            if (ImGui::Button(u8"\uf013", ImVec2(BTN_SIZE, BTN_SIZE))) { // FA cog
-                devToolsVisible = !devToolsVisible;
-            }
-        }
-#endif
-
-        // ⛶ Fullscreen (только на десктопе и больших экранах)
-        if (showFullscreen) {
-            ImGui::SameLine(0, 14.0f);
-            if (ImGui::Button(u8"\uf065", ImVec2(BTN_SIZE, BTN_SIZE))) {
-                SDL_Window* win = SDL_GL_GetCurrentWindow();
-                if (win) {
-                    Uint32 flags = SDL_GetWindowFlags(win);
-                    SDL_SetWindowFullscreen(win,
-                        (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP);
-                }
-            }
-        }
-
-        ImGui::PopStyleColor(3);
-        ImGui::PopStyleVar();
-    }
-    ImGui::End();
+    // Сам логотип
+    ImTextureID tex = (ImTextureID)(intptr_t)logoTexture;
+    dl->AddImage(tex, p1, p2);
 }
 
 // === Нижняя центральная панель навигации MISIS ===
@@ -736,103 +700,115 @@ void UIManager::drawBottomMenuBar(MapViewer& viewer) {
     ImGui::End();
 }
 
-// === USER Right Panel (если нужна). В DEV используем Dev Dock. ===
-void UIManager::drawRightPanel(MapViewer& viewer) {
-    // Оставим как есть или используем только для USER режима. В DEV режим основной — Dev Dock.
-    // Чтобы не дублировать, панель можно не вызывать из render(), как сейчас.
-}
 
 // === Dev Dock ===
 void UIManager::drawDevDock(MapViewer& viewer) {
     ImGuiIO& io = ImGui::GetIO();
 
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse;
+    // Минимальные размеры, чтобы кнопки в хедере всегда были видны
     if (devToolsMini) {
-        // В мини-режиме запрещаем ресайз, фиксируем высоту
-        ImGui::SetNextWindowSize(ImVec2(300, 72), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(320, 76), ImGuiCond_Always);
+        ImGui::SetNextWindowSizeConstraints(ImVec2(300, 70), ImVec2(FLT_MAX, FLT_MAX));
     }
     else {
-        ImGui::SetNextWindowSize(ImVec2(420, 420), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(460, 460), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSizeConstraints(ImVec2(420, 360), ImVec2(FLT_MAX, FLT_MAX));
     }
 
-    // Спавним окно в правом нижнем углу при первом появлении
     ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - 16, io.DisplaySize.y - 16),
         ImGuiCond_FirstUseEver, ImVec2(1, 1));
 
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse;
+
     if (ImGui::Begin("Dev Dock", nullptr, flags)) {
-        // Заголовок + мини-контролы (всегда видимы)
+        // Заголовок + кнопки
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.1f, 0.35f, 0.8f, 1.0f));
-        ImGui::TextUnformatted(u8"\uf188  Dev Tools"); // FA bug
+        ImGui::TextUnformatted(u8"\uf188  Dev Tools");
         ImGui::PopStyleColor();
 
+        // Кнопки справа: compact/expand + close (иконки — короткие, чтобы поместились)
         ImGui::SameLine();
         float right = ImGui::GetWindowContentRegionMax().x;
-        ImGui::SetCursorPosX(right - (devToolsMini ? 120.0f : 140.0f));
-        if (ImGui::SmallButton(devToolsMini ? u8"\uf065 expand" : u8"\uf066 compact")) { // expand/compress
+        const float btnW = 72.0f;
+        ImGui::SetCursorPosX(std::max(0.0f, right - (btnW * 2 + 8.0f)));
+        if (ImGui::SmallButton(devToolsMini ? u8"\uf065 expand" : u8"\uf066 compact")) {
             devToolsMini = !devToolsMini;
         }
-        ImGui::SameLine();
-        if (ImGui::SmallButton(u8"\uf00d close")) { // close
+        ImGui::SameLine(0, 8);
+        if (ImGui::SmallButton(u8"\uf00d close")) {
             devToolsVisible = false;
             ImGui::End();
             return;
         }
 
-        // MINI режим — только быстрые кнопки
         if (devToolsMini) {
             ImGui::Separator();
-            if (ImGui::Button(u8"\uf0e2 Undo", ImVec2(88, 26))) viewer.getGraphManager().undoGlobal();
+            if (ImGui::Button(u8"\uf0e2 Undo", ImVec2(88, 26))) { viewer.getGraphManager().undoGlobal(); pushToast("Undo"); }
             ImGui::SameLine();
-            if (ImGui::Button(u8"\uf01e Redo", ImVec2(88, 26))) viewer.getGraphManager().redoGlobal();
+            if (ImGui::Button(u8"\uf01e Redo", ImVec2(88, 26))) { viewer.getGraphManager().redoGlobal(); pushToast("Redo"); }
             ImGui::SameLine();
-            if (ImGui::Button(u8"\uf0c7 Save", ImVec2(88, 26))) viewer.getGraphManager().saveActive();
+            if (ImGui::Button(u8"\uf0c7 Save", ImVec2(88, 26))) { viewer.getGraphManager().saveActive(); pushToast("Saved Active Graph"); }
 
             ImGui::Separator();
             ImGui::Checkbox("Draw Nodes", &viewer.getDebugDrawNodes());
             ImGui::SameLine();
             ImGui::Text("FPS %.1f", io.Framerate);
-
             ImGui::End();
             return;
         }
 
-        // FULL режим
         ImGui::Separator();
+
         if (ImGui::BeginTabBar("DevDockTabs", ImGuiTabBarFlags_FittingPolicyResizeDown)) {
             // ==== Actions ====
-            if (ImGui::BeginTabItem(u8"\uf135 Actions")) { // rocket
-                if (ImGui::Button(u8"\uf0e2  Undo [Ctrl+Z]", ImVec2(-1, 28))) viewer.getGraphManager().undoGlobal();
-                if (ImGui::Button(u8"\uf01e  Redo [Ctrl+Y]", ImVec2(-1, 28))) viewer.getGraphManager().redoGlobal();
-                ImGui::Separator();
-                if (ImGui::Button(u8"\uf0c7  Save Active Graph [Ctrl+S]", ImVec2(-1, 28))) viewer.getGraphManager().saveActive();
-                if (ImGui::Button(u8"\uf0c7  Save Transitions", ImVec2(-1, 28))) viewer.getGraphManager().saveTransitions(Config::TRANSITIONS_PATH);
-                ImGui::Separator();
+            if (ImGui::BeginTabItem(u8"\uf135 Actions")) {
+                // Фиксированные колонки (не тянут кнопки при ресайзе)
+                if (ImGui::BeginTable("ActionsGrid", 3, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoBordersInBody)) {
+                    auto Btn = [&](const char* label, const char* toast, auto fn) {
+                        float w = ImGui::CalcTextSize(label).x + 24.0f;
+                        if (ImGui::Button(label, ImVec2(w, 28))) { fn(); if (toast && *toast) pushToast(toast); }
+                        };
 
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn(); Btn(u8"\uf0e2 Undo", "Undo", [&] { viewer.getGraphManager().undoGlobal(); });
+                    ImGui::TableNextColumn(); Btn(u8"\uf01e Redo", "Redo", [&] { viewer.getGraphManager().redoGlobal(); });
+                    ImGui::TableNextColumn(); Btn(u8"\uf0c7 Save Graph", "Saved Active Graph", [&] { viewer.getGraphManager().saveActive(); });
+
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn(); Btn(u8"\uf0c7 Save Trans", "Saved Transitions", [&] { viewer.getGraphManager().saveTransitions(Config::TRANSITIONS_PATH); });
+                    ImGui::TableNextColumn(); Btn("Mark Savepoint", "Savepoint marked", [&] { viewer.getGraphManager().history.markSavepoint(); });
+                    ImGui::TableNextColumn(); Btn("Dump History", "History dumped", [&] { viewer.getGraphManager().history.dumpToFile("history_dump.json"); });
+
+                    ImGui::EndTable();
+                }
+
+                ImGui::Separator();
                 bool clean = viewer.getGraphManager().history.isAtSavepoint();
                 ImGui::Text("History: undo=%zu redo=%zu  |  %s",
                     viewer.getGraphManager().history.undoSize(),
                     viewer.getGraphManager().history.redoSize(),
                     clean ? "Saved" : "Modified");
-                if (ImGui::Button("Mark Savepoint", ImVec2(-1, 24)))
-                    viewer.getGraphManager().history.markSavepoint();
-                if (ImGui::Button("Dump History to file", ImVec2(-1, 24)))
-                    viewer.getGraphManager().history.dumpToFile("history_dump.json");
                 ImGui::EndTabItem();
             }
 
             // ==== Info ====
-            if (ImGui::BeginTabItem(u8"\uf05a Info")) { // info-circle
+            if (ImGui::BeginTabItem(u8"\uf05a Info")) {
                 const Camera& cam = viewer.getCamera();
                 ImGui::Text("Zoom: %.0f%%", cam.getScale() * 100.0f);
                 ImGui::Text("FPS:  %.1f", io.Framerate);
                 ImGui::Text("Size: %.0fx%.0f", io.DisplaySize.x, io.DisplaySize.y);
                 ImGui::Separator();
-                ImGui::Checkbox("Draw Nodes", &viewer.getDebugDrawNodes());
-                ImGui::Checkbox("Allow Stairs [8]", &viewer.getUserAllowStairs());
-                ImGui::Checkbox("Allow Lifts [9]", &viewer.getUserAllowLift());
-                ImGui::Checkbox("Allow Bridges [0]", &viewer.getUserAllowBridge());
 
-                // History capacity
+                if (ImGui::BeginTable("Toggles", 2, ImGuiTableFlags_SizingFixedFit)) {
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn(); ImGui::Checkbox("Draw Nodes", &viewer.getDebugDrawNodes());
+                    ImGui::TableNextColumn(); ImGui::Checkbox("Allow Stairs [8]", &viewer.getUserAllowStairs());
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn(); ImGui::Checkbox("Allow Lifts [9]", &viewer.getUserAllowLift());
+                    ImGui::TableNextColumn(); ImGui::Checkbox("Allow Bridges [0]", &viewer.getUserAllowBridge());
+                    ImGui::EndTable();
+                }
+
                 size_t cap = viewer.getGraphManager().history.getMaxEntries();
                 int capInt = static_cast<int>(cap);
                 ImGui::SliderInt("History Capacity", &capInt, 50, 1000, "%d");
@@ -842,7 +818,7 @@ void UIManager::drawDevDock(MapViewer& viewer) {
             }
 
             // ==== Inspector ====
-            if (ImGui::BeginTabItem(u8"\uf002 Inspector")) { // search
+            if (ImGui::BeginTabItem(u8"\uf002 Inspector")) {
                 const std::string& id = viewer.getInspectorNodeId();
                 if (id.empty()) {
                     ImGui::TextDisabled("No node selected.");
@@ -855,6 +831,9 @@ void UIManager::drawDevDock(MapViewer& viewer) {
                         ImGui::Text("Floor: %d", n->floor);
                         ImGui::Text("Building: %s", n->building.c_str());
                         ImGui::Text("Neighbors: %zu", n->neighbors.size());
+                        if (ImGui::Button("Focus", ImVec2(100, 26))) viewer.focusNodeByIdSmart(n->id, true, false);
+                        ImGui::SameLine();
+                        if (ImGui::Button("Copy ID", ImVec2(100, 26))) ImGui::SetClipboardText(n->id.c_str());
                     }
                     else {
                         ImGui::TextDisabled("Node not found.");
@@ -863,38 +842,28 @@ void UIManager::drawDevDock(MapViewer& viewer) {
                 ImGui::EndTabItem();
             }
 
-            // ==== Goto (focus camera) ====
-            if (ImGui::BeginTabItem(u8"\uf124 Goto")) { // location-arrow
+            // ==== Goto ====
+            if (ImGui::BeginTabItem(u8"\uf124 Goto")) {
                 static std::string gotoStr;
-                ImGui::InputTextWithHint("##gotoNode", "node id / alias", &gotoStr);
-                ImGui::SameLine();
-                if (ImGui::Button("Go", ImVec2(60, 0))) {
-                    std::string id = viewer.getAliasManager().resolve(gotoStr);
-                    if (id.empty()) id = gotoStr;
-                    viewer.requestFocusToNode(id, 0.28f);
-                }
-                ImGui::TextDisabled("Hint: accepts alias or id. Focuses camera softly.");
-                ImGui::EndTabItem();
-            }
+                static bool optSwitchView = true;
+                static bool optAutoZoom = false;
+                static float targetZoom = 1.15f;
 
-            // ==== Console ====
-            if (ImGui::BeginTabItem(u8"\uf120 Console")) { // terminal
-                static char buf[512] = "";
-                static std::vector<std::string> log;
-                ImGui::BeginChild("log", ImVec2(-1, 180), true);
-                for (auto& l : log) ImGui::TextUnformatted(l.c_str());
-                ImGui::EndChild();
-                if (ImGui::InputText("##cmd", buf, IM_ARRAYSIZE(buf), ImGuiInputTextFlags_EnterReturnsTrue)) {
-                    std::string cmd = buf;
-                    if (cmd == "clear") log.clear();
-                    else if (cmd == "undo") viewer.getGraphManager().undoGlobal();
-                    else if (cmd == "redo") viewer.getGraphManager().redoGlobal();
-                    else if (cmd == "save") viewer.getGraphManager().saveActive();
-                    else if (cmd == "save_tr") viewer.getGraphManager().saveTransitions(Config::TRANSITIONS_PATH);
-                    else if (cmd == "mark_savepoint") viewer.getGraphManager().history.markSavepoint();
-                    else log.push_back("> " + cmd);
-                    buf[0] = 0;
+                ImGui::PushItemWidth(-1);
+                if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+                ImGui::InputTextWithHint("##gotoNode", "node id / alias", &gotoStr);
+                ImGui::PopItemWidth();
+
+                if (ImGui::Button("Go", ImVec2(60, 0))) {
+                    viewer.focusNodeByIdSmart(gotoStr, optSwitchView, optAutoZoom, targetZoom);
+                    pushToast("Focused");
                 }
+
+                ImGui::Checkbox("Switch view to node (campus/floor)", &optSwitchView);
+                ImGui::Checkbox("Auto zoom", &optAutoZoom);
+                if (optAutoZoom) ImGui::SliderFloat("Target zoom", &targetZoom, Config::MIN_ZOOM, Config::MAX_ZOOM, "%.2f");
+
+                ImGui::TextDisabled("Hint: accepts alias or id. Switches view and focuses smoothly.");
                 ImGui::EndTabItem();
             }
 
@@ -904,34 +873,43 @@ void UIManager::drawDevDock(MapViewer& viewer) {
     ImGui::End();
 }
 
-// === Плавающая кнопка-развёртка для Mini режима (чтобы всегда была доступна) ===
-void UIManager::drawDevDockToggleButton() {
-    ImGuiIO& io = ImGui::GetIO();
-    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - 18.0f, io.DisplaySize.y - 96.0f),
-        ImGuiCond_Always, ImVec2(1, 1));
-    ImGui::SetNextWindowBgAlpha(0.0f); // полностью прозрачный фон
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration |
-        ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoMove |
-        ImGuiWindowFlags_NoSavedSettings |
-        ImGuiWindowFlags_NoFocusOnAppearing |
-        ImGuiWindowFlags_NoNav;
-
-    if (ImGui::Begin("DevDockToggle", nullptr, flags)) {
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 18.0f);
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.10f, 0.50f, 1.00f, 0.90f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.12f, 0.60f, 1.00f, 0.95f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.08f, 0.45f, 0.90f, 0.95f));
-        if (ImGui::Button(u8"\uf065", ImVec2(36, 36))) { // expand icon
-            devToolsMini = false;
-        }
-        ImGui::PopStyleColor(3);
-        ImGui::PopStyleVar();
-    }
-    ImGui::End();
+void UIManager::pushToast(const std::string& txt, ImVec4 col, float duration) {
+    toasts.push_back(Toast{ txt, col, duration, 0.0f });
 }
 
-// (Не используется напрямую сейчас)
-void UIManager::drawDevInfoWindow(MapViewer& mapViewer) {
-    // Оставлено пустым — DevDock покрывает потребности.
+void UIManager::drawToasts() {
+    if (toasts.empty()) return;
+    ImGuiIO& io = ImGui::GetIO();
+    ImDrawList* dl = ImGui::GetForegroundDrawList();
+
+    const float margin = 16.0f;
+    ImVec2 pos(io.DisplaySize.x - margin, io.DisplaySize.y - margin); // старт снизу справа
+
+    // Рисуем снизу вверх
+    for (int i = (int)toasts.size() - 1; i >= 0; --i) {
+        Toast& t = toasts[i];
+        t.age += io.DeltaTime;
+        float alpha = 1.0f;
+        float fade = 0.25f; // последние 0.25с — fade-out
+        if (t.age > t.ttl - fade) alpha = std::max(0.0f, (t.ttl - t.age) / fade);
+
+        ImVec2 textSz = ImGui::CalcTextSize(t.text.c_str());
+        ImVec2 boxSz(textSz.x + 20.0f, textSz.y + 12.0f);
+        ImVec2 p1(pos.x - boxSz.x, pos.y - boxSz.y);
+        ImVec2 p2(pos.x, pos.y);
+
+        ImU32 bg = ImGui::GetColorU32(ImVec4(0.05f, 0.08f, 0.12f, 0.85f * alpha));
+        ImU32 bd = ImGui::GetColorU32(ImVec4(0.20f, 0.40f, 0.90f, 0.9f * alpha));
+        ImU32 fg = ImGui::GetColorU32(ImVec4(t.color.x, t.color.y, t.color.z, alpha));
+
+        dl->AddRectFilled(p1, p2, bg, 8.0f);
+        dl->AddRect(p1, p2, bd, 8.0f, 0, 1.5f);
+        dl->AddText(ImVec2(p1.x + 10.0f, p1.y + 6.0f), fg, t.text.c_str());
+
+        pos.y -= (boxSz.y + 8.0f);
+
+        if (t.age >= t.ttl) {
+            toasts.erase(toasts.begin() + i);
+        }
+    }
 }

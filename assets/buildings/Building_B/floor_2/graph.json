@@ -1,31 +1,38 @@
 {
-  "nodes": [
-    {
-      "id": "B_2_STAIR_1",
-      "x": 180,
-      "y": 200,
-      "building": "Building_B",
-      "floor": 2,
-      "isPortal": true,
-      "neighbors": [ "B_2_COR_1" ]
-    },
-    {
-      "id": "B_2_COR_1",
-      "x": 140,
-      "y": 70,
-      "building": "Building_B",
-      "floor": 2,
-      "isPortal": false,
-      "neighbors": [ "B_2_STAIR_1", "B_2_ROOM_201" ]
-    },
-    {
-      "id": "B_2_ROOM_201",
-      "x": 250,
-      "y": 90,
-      "building": "Building_B",
-      "floor": 2,
-      "isPortal": false,
-      "neighbors": [ "B_2_COR_1" ]
-    }
-  ]
+    "nodes": [
+        {
+            "building": "Building_B",
+            "floor": 2,
+            "id": "B_2_STAIR_1",
+            "isPortal": true,
+            "neighbors": [
+                "B_2_COR_1"
+            ],
+            "x": 180,
+            "y": 200
+        },
+        {
+            "building": "Building_B",
+            "floor": 2,
+            "id": "B_2_COR_1",
+            "isPortal": false,
+            "neighbors": [
+                "B_2_STAIR_1",
+                "B_2_ROOM_201"
+            ],
+            "x": 140,
+            "y": 70
+        },
+        {
+            "building": "Building_B",
+            "floor": 2,
+            "id": "B_2_ROOM_201",
+            "isPortal": false,
+            "neighbors": [
+                "B_2_COR_1"
+            ],
+            "x": 250,
+            "y": 90
+        }
+    ]
 }

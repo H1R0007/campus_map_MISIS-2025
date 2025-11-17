@@ -69,7 +69,8 @@ void Engine::initImGui() {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
-    io.Fonts->AddFontFromFileTTF("assets/UI/fonts/Roboto-Regular.ttf", 18.0f);
+    const ImWchar* range_cyr = io.Fonts->GetGlyphRangesCyrillic();
+    io.Fonts->AddFontFromFileTTF("assets/UI/fonts/Roboto-Regular.ttf", 18.0f, nullptr, range_cyr);
 
     ImFontConfig cfg;
     cfg.MergeMode = true;

@@ -162,6 +162,19 @@ std::string GraphManager::addNode(int x, int y, int floor) {
     Graph* g = (activeKey == "__campus") ? &campusGraph : &graphs[activeKey];
     std::string newId = g->addNode(x, y, floor);
 
+    // NEW: проставляем building
+    if (const Node* pn = g->getNode(newId)) {
+        // вычисляем id корпуса из activeKey
+        std::string bld = "CAMPUS";
+        if (activeKey != "__campus") {
+            size_t p = activeKey.find("_floor_");
+            if (p != std::string::npos) bld = activeKey.substr(0, p);
+        }
+        auto& nodes = g->getNodesMutable();
+        auto it = nodes.find(newId);
+        if (it != nodes.end()) it->second.building = bld;
+    }
+
     if (!performingUndoRedo) {
         const Node* n = g->getNode(newId);
         if (n) {
@@ -184,7 +197,6 @@ std::string GraphManager::addNode(int x, int y, int floor) {
     }
     return newId;
 }
-
 void GraphManager::removeNodeById(const std::string& id) {
     Graph* g = (activeKey == "__campus") ? &campusGraph : &graphs[activeKey];
 

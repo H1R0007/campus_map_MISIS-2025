@@ -246,19 +246,23 @@ void MapViewer::updateSuggestions() {
     prevResolvedToId = resolvedToId;
 }
 
-void MapViewer::requestFocusToNode(const std::string& nodeId, float durationSec) {
-    if (Config::DEV_MODE) return; // только для USER режима
+void MapViewer::requestFocusToNode(const std::string& nodeId, float durationSec, bool force) {
+    // В USER-режиме — всегда можно; в DEV — только если force == true
+#ifndef EMSCRIPTEN
+    if (Config::DEV_MODE && !force) return;
+#endif
 
     const Node* n = graphManager.getNode(nodeId);
     if (!n) return;
 
     // Проверим видимость на текущем представлении
     bool visible = false;
+    std::string nbld = n->building.empty() ? "CAMPUS" : n->building;
     if (currentView == ViewMode::Campus) {
-        visible = (n->building == "CAMPUS");
+        visible = (nbld == "CAMPUS");
     }
     else {
-        visible = (n->building == currentBuilding && n->floor == currentFloor);
+        visible = (nbld == currentBuilding && n->floor == currentFloor);
     }
     if (!visible) return;
 
@@ -276,7 +280,46 @@ void MapViewer::requestFocusToNode(const std::string& nodeId, float durationSec)
     focusAnim.start = start;
     focusAnim.target = target;
     focusAnim.t = 0.f;
-    focusAnim.duration = std::max(0.12f, durationSec); // защита от слишком коротких значений
+    focusAnim.duration = std::max(0.12f, durationSec);
+}
+
+void MapViewer::focusNodeByIdSmart(const std::string& idOrAlias,
+    bool switchViewIfNeeded,
+    bool adjustZoom,
+    float targetZoom)
+{
+    // 1) Резолвим алиас → id или используем введённый id
+    std::string id = aliasManager.resolve(idOrAlias);
+    if (id.empty() && graphManager.getNode(idOrAlias)) id = idOrAlias;
+    if (id.empty()) {
+        std::cout << "[DevDock] Node not found for: " << idOrAlias << "\n";
+        return;
+    }
+
+    const Node* n = graphManager.getNode(id);
+    if (!n) return;
+
+    // 2) По необходимости переключаем вид (кампус/этаж)
+    std::string nbld = n->building.empty() ? "CAMPUS" : n->building;
+    if (switchViewIfNeeded) {
+        if (nbld == "CAMPUS" && currentView != ViewMode::Campus) {
+            switchViewToCampus();
+        }
+        else if (nbld != "CAMPUS") {
+            if (currentView != ViewMode::BuildingFloor || currentBuilding != nbld || currentFloor != n->floor) {
+                switchToFloor(nbld, n->floor);
+            }
+        }
+    }
+
+    // 3) Опционально подстраиваем зум (не агрессивно)
+    if (adjustZoom) {
+        float tz = std::clamp(targetZoom, Config::MIN_ZOOM, Config::MAX_ZOOM);
+        camera.setScale(tz);
+    }
+
+    // 4) Мягкое наведение (force=true, чтобы работало и в DEV)
+    requestFocusToNode(id, 0.28f, true);
 }
 
 void MapViewer::updateCameraFocus(float dt) {

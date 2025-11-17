@@ -1,40 +1,50 @@
 {
-  "nodes": [
-    {
-      "id": "B_1_ENTRY_1",
-      "x": 60,
-      "y": 60,
-      "building": "Building_B",
-      "floor": 1,
-      "isPortal": true,
-      "neighbors": [ "B_1_COR_1" ]
-    },
-    {
-      "id": "B_1_COR_1",
-      "x": 160,
-      "y": 70,
-      "building": "Building_B",
-      "floor": 1,
-      "isPortal": false,
-      "neighbors": [ "B_1_ENTRY_1", "B_1_ROOM_101", "B_1_STAIR_1" ]
-    },
-    {
-      "id": "B_1_ROOM_101",
-      "x": 260,
-      "y": 80,
-      "building": "Building_B",
-      "floor": 1,
-      "isPortal": false,
-      "neighbors": [ "B_1_COR_1" ]
-    },
-    {
-      "id": "B_1_STAIR_1",
-      "x": 180,
-      "y": 200,
-      "building": "Building_B",
-      "floor": 1,
-      "isPortal": true,
-      "neighbors": [ "B_1_COR_1" ]
-    }
-  ]
+    "nodes": [
+        {
+            "building": "Building_B",
+            "floor": 1,
+            "id": "B_1_ENTRY_1",
+            "isPortal": true,
+            "neighbors": [
+                "B_1_COR_1"
+            ],
+            "x": 60,
+            "y": 60
+        },
+        {
+            "building": "Building_B",
+            "floor": 1,
+            "id": "B_1_COR_1",
+            "isPortal": false,
+            "neighbors": [
+                "B_1_ENTRY_1",
+                "B_1_ROOM_101",
+                "B_1_STAIR_1"
+            ],
+            "x": 160,
+            "y": 70
+        },
+        {
+            "building": "Building_B",
+            "floor": 1,
+            "id": "B_1_ROOM_101",
+            "isPortal": false,
+            "neighbors": [
+                "B_1_COR_1"
+            ],
+            "x": 260,
+            "y": 80
+        },
+        {
+            "building": "Building_B",
+            "floor": 1,
+            "id": "B_1_STAIR_1",
+            "isPortal": true,
+            "neighbors": [
+                "B_1_COR_1"
+            ],
+            "x": 180,
+            "y": 200
+        }
+    ]
 }

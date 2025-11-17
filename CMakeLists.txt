@@ -25,7 +25,7 @@ option(USE_SDL_IMAGE "Use SDL2_image (PNG, JPG, etc.)" ON)
 option(USE_SDL_TTF   "Use SDL2_ttf (fonts)"            ON)
 
 if (MSVC)
-  target_compile_options(campus_map PRIVATE /W4 /permissive-)
+  target_compile_options(campus_map PRIVATE /W4 /permissive- /utf-8)
 else()
   target_compile_options(campus_map PRIVATE -Wall -Wextra -Wpedantic)
 endif()
